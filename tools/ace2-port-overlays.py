@@ -33,10 +33,14 @@ def main() -> int:
     p.add_argument("--report-dir", type=Path, required=True)
     p.add_argument("--write", action="store_true",
                    help="Apply clean merges to Ace 2 checkout, keeping a report (default: dry-run)")
+    p.add_argument("--preview-base-drift", action="store_true",
+                   help="Dry-run only: preview textual merges even when recorded SM8750 source hash differs")
     p.add_argument("--include-risky", action="store_true",
                    help="Show/attempt incompatible SM8750 BE datapath files (off by default)")
     args = p.parse_args()
     donor, base, target = (x.resolve() for x in (args.donor, args.sm8750_base, args.ace2))
+    if args.write and args.preview_base_drift:
+        p.error("--preview-base-drift can never be combined with --write")
     report_dir = args.report_dir.resolve()
     report_dir.mkdir(parents=True, exist_ok=True)
     mapping = json.loads((donor / "kernel/source-map.json").read_text(encoding="utf-8"))
@@ -74,7 +78,7 @@ def main() -> int:
             expected_hash = value.get("sha256")
             expected_ok = (expected_hash == sha256(ancestor.read_bytes())) if expected_hash else None
             status["reference_base_hash_match"] = expected_ok
-            if expected_ok is False:
+            if expected_ok is False and not args.preview_base_drift:
                 status["status"] = "reference-sha-mismatch"
                 failures += 1
             else:
@@ -83,18 +87,20 @@ def main() -> int:
                      str(destination),str(ancestor),str(source)],
                      stdout=subprocess.PIPE,stderr=subprocess.PIPE)
                 if proc.returncode == 0 and b"<<<<<<<" not in proc.stdout:
-                    status["status"] = "clean-merged"
+                    status["status"] = "base-drift-clean-preview" if expected_ok is False else "clean-merged"
                     status["changed"] = proc.stdout != destination.read_bytes()
                     if args.write and status["changed"]:
                         destination.write_bytes(proc.stdout)
                 else:
-                    status["status"] = "conflict" if proc.returncode > 0 else "merge-error"
+                    status["status"] = "base-drift-conflict" if (expected_ok is False and proc.returncode > 0) else ("conflict" if proc.returncode > 0 else "merge-error")
                     status["merge_exit"] = proc.returncode
                     status["stderr"] = proc.stderr.decode(errors="replace")[:1000]
                     conflict = report_dir / "conflicts" / rel
                     conflict.parent.mkdir(parents=True, exist_ok=True)
                     conflict.write_bytes(proc.stdout)
                     failures += 1
+                if expected_ok is False:
+                    failures += 1  # A textual merge with an unverified ancestor is never acceptable for release.
         entries.append(status)
     summary = {"device":"OnePlus Ace 2 SM8475", "applied": args.write,
         "firmware_verified":False,"runtime_usable":False,
