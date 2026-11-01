@@ -72,7 +72,7 @@ def main() -> int:
             status["changed"] = True
             # New code files may contain historical extra empty lines at EOF.
             # Normalize only trailing newlines; never alter non-newline bytes.
-            pending[destination] = source.read_bytes().rstrip(b"\\n") + b"\\n"
+            pending[destination] = source.read_bytes().rstrip(b"\n") + b"\n"
         elif not ancestor.is_file():
             status["status"] = "no-common-ancestor"
             failures += 1
