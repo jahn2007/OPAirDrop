@@ -60,6 +60,7 @@ jobs:
           python3 tools/ace2-port-core.py --source "$RUNNER_TEMP/ace2-vendor" --report "$RUNNER_TEMP/pas-host-mode.json"
           # Repeat application to prove our source rewrite is idempotent.
           python3 tools/ace2-port-core.py --source "$RUNNER_TEMP/ace2-vendor"
+          git -C "$RUNNER_TEMP/ace2-vendor" add -N vendor/qcom/opensource/wlan/qcacld-3.0/core/wma/src/ace2_awdl_frame.h
           git -C "$RUNNER_TEMP/ace2-vendor" diff --check
           git -C "$RUNNER_TEMP/ace2-vendor" diff -- \
             vendor/qcom/opensource/wlan/qca-wifi-host-cmn/qdf/inc/qdf_types.h \
