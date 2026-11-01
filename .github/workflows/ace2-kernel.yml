@@ -80,7 +80,7 @@ jobs:
             ${{ runner.temp }}/pas-host-mode.json
             ${{ runner.temp }}/ace2-core-platform.patch
   kernel-baseline:
-    if: github.event_name == 'workflow_dispatch' && inputs.full_kernel
+    if: (github.event_name == 'workflow_dispatch' && inputs.full_kernel) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[ace2-full-kernel]'))
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
@@ -98,6 +98,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          export ACE2_APPLY_MODE_PATCH=1
           export ACE2_PORT_ROOT="$GITHUB_WORKSPACE"
           export ACE2_BUILD_ROOT="$RUNNER_TEMP/ace2"
           bash tools/ace2-build-baseline.sh
