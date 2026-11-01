@@ -43,6 +43,8 @@ def main() -> int:
     entries = []
     failures = 0
     for key, value in sorted(mapping.items()):
+        if "kernel_path" not in value:
+            continue  # host-side test helpers, not source overlays
         rel = Path(value["kernel_path"])
         if key in INCOMPATIBLE_COMPONENTS and not args.include_risky:
             entries.append({"source":key,"target":str(rel),"status":"skipped-architecture-incompatible"})
