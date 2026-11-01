@@ -41,3 +41,39 @@ All listed checks are **source presence checks**, not compiled-feature or firmwa
 ## External constraints
 
 The repo currently packages archived driver and Mosey binaries; a release ZIP is not a reproducible kernel build by itself. The platform port must not silently substitute the existing SM8750 binaries or claim functionality based only on host-side WMI APIs.
+
+## Implementation update — 2026-11-02
+
+The following files on this branch now generate actual changes to the official
+SM8475 vendor source, rather than merely documenting an implementation route:
+
+- `tools/ace2-port-core.py` inserts the PAS host enum entries into QDF,
+  adds the disabled-by-default `CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE` Kconfig
+  symbol and Kbuild define, and installs the validated classifier header.
+- `kernel/ace2/wlan_hdd_opairshare_frame.h` classifies probe request,
+  Action and Apple-encapsulated QoS DATA frames. This is wired into
+  `kernel/driver/wma_opairshare_pas_mgmt.h` only when
+  `OPAIRSHARE_ACE2_PAS_BRIDGE` is defined. Host C tests exercise the layout.
+- `tools/ace2-port-overlays.py` stages only the exact-hash verified parts
+  of the SM8750 driver overlays, transactionally, without copying BE-only
+  sources. It reports blocked files and produces a standalone source patch.
+- `tools/ace2-resolve-core.py` produces a separate **candidate** patch for
+  the older SM8475 `target_if_vdev_mgr_rx_ops.c`, `wlan_hdd_tx_rx.c` and
+  `wma_dev_if.c`. It preserves the older RPS path and excludes new-generation
+  code where it cannot be safely transplanted.
+- GitHub Actions `ace2-kernel.yml` validates the C frame classifier,
+  stages source changes and exports a patch. Full official Linux 5.10 vendor
+  kernel build is an additional gated job.
+- GitHub Actions `ace2-merge-preview.yml` exports the strict partial patch
+  and separately the candidate conflict-resolution patch, together with the
+  complete blocker list.
+
+**The platform port is still incomplete.** A patch generation green check is
+not a kernel compilation result. The vendor QCA6490 driver has not yet been
+proven to create, start, and delete the required Wonder-bound PAS/NDI session,
+nor to transmit QoS DATA over WMI RAW, nor to deliver the receive path and ACKs.
+No Ace 2 installer or Release is authorized by these steps.
+
+Current blockers are the remaining QCA6490 WMA/HDD/DP source differences,
+missing target paths, Linux 5.10 symbol/ABI reconciliation, full vendor kernel
+compilation, and (when the user authorizes hardware testing) firmware behavior.
