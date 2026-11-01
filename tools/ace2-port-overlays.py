@@ -98,9 +98,8 @@ def main() -> int:
                     conflict = report_dir / "conflicts" / rel
                     conflict.parent.mkdir(parents=True, exist_ok=True)
                     conflict.write_bytes(proc.stdout)
-                    failures += 1
-                if expected_ok is False:
-                    failures += 1  # A textual merge with an unverified ancestor is never acceptable for release.
+                if expected_ok is False or proc.returncode != 0 or b"<<<<<<<" in proc.stdout:
+                    failures += 1  # One blocker per file; a drifted ancestor is never release-safe.
         entries.append(status)
     summary = {"device":"OnePlus Ace 2 SM8475", "applied": args.write,
         "firmware_verified":False,"runtime_usable":False,
