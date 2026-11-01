@@ -9,6 +9,8 @@ on:
       - '.github/workflows/ace2-merge-preview.yml'
       - 'kernel/source-map.json'
       - 'kernel/driver/**'
+      - 'kernel/ace2/**'
+      - 'tools/ace2-port-core.py'
 
 permissions:
   contents: read
@@ -27,7 +29,15 @@ jobs:
           import json
           with open("kernel/source-map.json",encoding="utf-8") as f:
               m=json.load(f)
-          for path in sorted({v["kernel_path"] for v in m.values() if "kernel_path" in v}):
+          overlay_paths = {v["kernel_path"] for v in m.values() if "kernel_path" in v}
+          overlay_paths.update({
+            "vendor/qcom/opensource/wlan/qca-wifi-host-cmn/qdf/inc/qdf_types.h",
+            "vendor/qcom/opensource/wlan/qca-wifi-host-cmn/qdf/src/qdf_types.c",
+            "vendor/qcom/opensource/wlan/qca-wifi-host-cmn/dp/inc/cdp_txrx_cmn_struct.h",
+            "vendor/qcom/opensource/wlan/qcacld-3.0/Kbuild",
+            "vendor/qcom/opensource/wlan/qcacld-3.0/Kconfig",
+          })
+          for path in sorted(overlay_paths):
               print("/"+path)
           PY
       - name: Clone reference SM8750 baseline at the original pinned SHA
@@ -53,7 +63,8 @@ jobs:
           git -C "$RUNNER_TEMP/sm8475" sparse-checkout init --no-cone
           git -C "$RUNNER_TEMP/sm8475" sparse-checkout set --no-cone --stdin < "$RUNNER_TEMP/ace2-sparse-paths"
           git -C "$RUNNER_TEMP/sm8475" checkout HEAD
-      - name: Attempt safe read-only three-way merges
+      - name: Inspect conflicts and ancestor drift without source writes
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -63,6 +74,22 @@ jobs:
             --ace2 "$RUNNER_TEMP/sm8475" \
             --report-dir "$RUNNER_TEMP/ace2-merge" \
             --preview-base-drift
+      - name: Stage verified SM8750 overlays and native Ace 2 host definitions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ace2-port-core.py --source "$RUNNER_TEMP/sm8475" --report "$RUNNER_TEMP/ace2-merge/pas-host-mode.json"
+          python3 tools/ace2-port-overlays.py \
+            --donor "$GITHUB_WORKSPACE" \
+            --sm8750-base "$RUNNER_TEMP/sm8750" \
+            --ace2 "$RUNNER_TEMP/sm8475" \
+            --report-dir "$RUNNER_TEMP/ace2-merge/staged" \
+            --write --safe-only
+          git -C "$RUNNER_TEMP/sm8475" add -A vendor/qcom/opensource/wlan
+          git -C "$RUNNER_TEMP/sm8475" diff --cached --check
+          git -C "$RUNNER_TEMP/sm8475" diff --cached --binary > "$RUNNER_TEMP/ace2-merge/ace2-safe-source.patch"
+          test -s "$RUNNER_TEMP/ace2-merge/ace2-safe-source.patch"
+          echo "Created a source patch. This is NOT a buildable module or validated AirDrop backend."
       - name: Upload detailed port blockers
         if: always()
         uses: actions/upload-artifact@v4
