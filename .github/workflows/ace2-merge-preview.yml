@@ -11,6 +11,7 @@ on:
       - 'kernel/driver/**'
       - 'kernel/ace2/**'
       - 'tools/ace2-port-core.py'
+      - 'tools/ace2-resolve-core.py'
 
 permissions:
   contents: read
@@ -90,6 +91,20 @@ jobs:
           git -C "$RUNNER_TEMP/sm8475" diff --cached --binary > "$RUNNER_TEMP/ace2-merge/ace2-safe-source.patch"
           test -s "$RUNNER_TEMP/ace2-merge/ace2-safe-source.patch"
           echo "Created a source patch. This is NOT a buildable module or validated AirDrop backend."
+      - name: Resolve three critical SM8475-specific WLAN conflict candidates
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ace2-resolve-core.py \
+            --conflict-root "$RUNNER_TEMP/ace2-merge/conflicts" \
+            --target-root "$RUNNER_TEMP/sm8475" \
+            --report "$RUNNER_TEMP/ace2-merge/critical-candidate-report.json" \
+            --write
+          git -C "$RUNNER_TEMP/sm8475" diff --check
+          git -C "$RUNNER_TEMP/sm8475" diff --binary > "$RUNNER_TEMP/ace2-merge/critical-candidate-source.patch"
+          test -s "$RUNNER_TEMP/ace2-merge/critical-candidate-source.patch"
+          echo "Candidate patch is not release-ready. Kernel compilation and human review required."
       - name: Upload detailed port blockers
         if: always()
         uses: actions/upload-artifact@v4
