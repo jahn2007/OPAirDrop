@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+"""Summarize SM8475 baseline .ko artifacts. Reports compilation, NOT AirDrop support."""
+import argparse
+import json
+import pathlib
+import subprocess
+
+def read_modinfo(module):
+    if not _has_tool("modinfo"):
+        return {}
+    data = {}
+    for key in ("name", "vermagic", "depends", "srcversion", "signer"):
+        p = subprocess.run(["modinfo", "-F", key, str(module)], capture_output=True, text=True)
+        if p.returncode == 0:
+            data[key] = p.stdout.strip()
+    return data
+
+def _has_tool(name):
+    import shutil
+    return bool(shutil.which(name))
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", required=True, type=pathlib.Path)
+    parser.add_argument("--out", required=True, type=pathlib.Path)
+    args = parser.parse_args()
+    root = args.root.resolve()
+    if not (root / "kernel_platform").is_dir():
+        raise SystemExit("Not a OnePlusOSS kernel checkout")
+    mods = []
+    for module in sorted(root.rglob("*.ko")):
+        if len(mods) >= 500:
+            raise SystemExit("Unexpected excessive .ko candidates")
+        import hashlib
+        dig = hashlib.sha256()
+        with module.open("rb") as f:
+            for block in iter(lambda: f.read(1024*1024), b""):
+                dig.update(block)
+        mods.append({"path": str(module.relative_to(root)), "bytes":module.stat().st_size,
+                     "sha256":dig.hexdigest(), "modinfo":read_modinfo(module)})
+    result = {"platform":"oneplus_ace2_sm8475","modules_found":len(mods),
+              "firmware_awdl_verified":False,"airdrop_working":False,"modules":mods}
+    args.out.parent.mkdir(parents=True,exist_ok=True)
+    args.out.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
+    print("Reported", len(mods), "modules to", args.out)
+    if not mods:
+        raise SystemExit("No kernel modules found; build output is incomplete")
+    if not any(("wlan" in m["path"].lower() or "qca_cld" in m["path"].lower()) for m in mods):
+        raise SystemExit("No Qualcomm WLAN module artifact found")
+if __name__=="__main__":
+    main()
