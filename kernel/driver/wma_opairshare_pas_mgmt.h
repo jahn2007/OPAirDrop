@@ -8,6 +8,9 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/ieee80211.h>
+#ifdef OPAIRSHARE_ACE2_PAS_BRIDGE
+#include "ace2_awdl_frame.h"
+#endif
 
 static bool passthru_mgmt_bridge;
 module_param(passthru_mgmt_bridge, bool, 0444);
@@ -1349,6 +1352,19 @@ int opairshare_pas_mgmt_xmit(struct sk_buff *skb, struct wlan_objmgr_vdev *vdev,
 	    skb_copy_bits(skb, rtlen, fcbytes, sizeof(fcbytes)))
 		goto invalid;
 	fc = fcbytes[0] | (fcbytes[1] << 8);
+#ifdef OPAIRSHARE_ACE2_PAS_BRIDGE
+	{
+		ace2_byte frame[34];
+		unsigned int remaining = skb->len - rtlen;
+		unsigned int copy_len = remaining < sizeof(frame) ?
+			remaining : sizeof(frame);
+
+		if (remaining < 24 ||
+		    skb_copy_bits(skb, rtlen, frame, copy_len) ||
+		    ace2_awdl_classify(frame, remaining) == ACE2_AWDL_REJECT)
+			goto invalid;
+	}
+#endif
 	if ((fc & IEEE80211_FCTL_FTYPE) != IEEE80211_FTYPE_MGMT) {
 		uint8_t llc[8];
 		static const uint8_t awdl_llc[8] =
