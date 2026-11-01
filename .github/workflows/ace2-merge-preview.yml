@@ -27,7 +27,7 @@ jobs:
           import json
           with open("kernel/source-map.json",encoding="utf-8") as f:
               m=json.load(f)
-          for path in sorted({v["kernel_path"] for v in m.values()}):
+          for path in sorted({v["kernel_path"] for v in m.values() if "kernel_path" in v}):
               print("/"+path)
           PY
       - name: Clone reference SM8750 baseline at the original pinned SHA
