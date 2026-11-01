@@ -67,7 +67,7 @@ def resolve(rel: str, text: str) -> tuple[str, list[str]]:
         # Only the start-response handler needs these locals; find its body.
         begin = text.index("static int target_if_vdev_mgr_start_response_handler(")
         pos = text.index(signature, begin)
-        if text.find(signature, begin, pos + len(signature) + 1) != -1:
+        if text.find(signature, pos + len(signature), text.index("if (!scn || !data)", begin)) != -1:
             raise ValueError("Ambiguous vdev timer declaration")
         local = (
             "#ifdef DRIVER_PASSTHRU_MODE\n"
