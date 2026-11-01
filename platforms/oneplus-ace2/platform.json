@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "id": "oneplus_ace2_sm8475",
+  "codename": "ace2",
+  "marketing_name": "OnePlus Ace 2",
+  "device_model": "PHK110",
+  "soc": "SM8475",
+  "wifi_chip": "QCA6490",
+  "android_sdk": 35,
+  "kernel_release_prefix": "5.10.",
+  "oplus_build_target": "waipio",
+  "kernel_manifest_url": "https://github.com/OnePlusOSS/kernel_manifest/blob/oneplus/sm8475/oneplus_ace2_v.xml",
+  "kernel_source_repository": "OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8475",
+  "kernel_source_ref": "oneplus/sm8475_v_15.0.0_ace_2",
+  "wlan_path": "vendor/qcom/opensource/wlan",
+  "design": "Reuse Mosey, Wonder, OShare. Build minimal PAS-host / NDI-firmware TX/RX bridge. First release supports AWDL-exclusive mode only.",
+  "constraints": {
+    "never_load_foreign_kernel_modules": true,
+    "never_disable_regulatory_validation": true,
+    "prefer_single_radio_exclusive_awdl": true,
+    "require_exact_kernel_abi_match": true,
+    "source_only_does_not_prove_firmware_feature": true,
+    "never_publish_unverified_release_as_working": true
+  },
+  "source_checks": [
+    {
+      "path": "qcacld-3.0/configs/default_defconfig",
+      "all": [
+        "CONFIG_CNSS_QCA6490",
+        "CONFIG_LITHIUM",
+        "CONFIG_QCACLD_FEATURE_NAN"
+      ]
+    },
+    {
+      "path": "qcacld-3.0/core/hdd/src/wlan_hdd_rx_monitor.c",
+      "all": [
+        "hdd_rx_monitor_callback",
+        "cdp_set_monitor_mode"
+      ]
+    },
+    {
+      "path": "qcacld-3.0/core/hdd/src/wlan_hdd_nan_datapath.c",
+      "all": [
+        "hdd_ndi_open",
+        "hdd_ndi_start",
+        "hdd_ndi_delete"
+      ]
+    },
+    {
+      "path": "qcacld-3.0/core/wma/src/wma_mgmt.c",
+      "all": [
+        "wma_mgmt_unified_cmd_send",
+        "wmi_service_mgmt_tx_wmi"
+      ]
+    },
+    {
+      "path": "qca-wifi-host-cmn/wmi/src/wmi_unified_tlv.c",
+      "all": [
+        "populate_tx_send_params",
+        "WMI_TX_SEND_PARAM_FRAME_TYPE_SET",
+        "WMI_MGMT_TX_SEND_CMDID"
+      ]
+    },
+    {
+      "path": "qca-wifi-host-cmn/wmi/src/wmi_unified_p2p_tlv.c",
+      "all": [
+        "WMI_VDEV_ADD_MAC_ADDR_TO_RX_FILTER_CMDID",
+        "extract_mac_addr_rx_filter_evt_param_tlv"
+      ]
+    },
+    {
+      "path": "qca-wifi-host-cmn/dp/wifi3.0/dp_tx.c",
+      "all": [
+        "dp_tx_prepare_raw",
+        "htt_cmn_pkt_type_raw"
+      ]
+    },
+    {
+      "path": "qca-wifi-host-cmn/dp/wifi3.0/dp_rx.c",
+      "all": [
+        "dp_rx_deliver_raw",
+        "DP_RX_DROP_RAW_FRM"
+      ]
+    }
+  ]
+}
