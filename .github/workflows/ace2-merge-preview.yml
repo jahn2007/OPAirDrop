@@ -1,0 +1,72 @@
+name: OnePlus Ace 2 — cross-generation WLAN overlay merge
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/oneplus-ace2-sm8475]
+    paths:
+      - 'tools/ace2-port-overlays.py'
+      - '.github/workflows/ace2-merge-preview.yml'
+      - 'kernel/source-map.json'
+      - 'kernel/driver/**'
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare exact WLAN source sparse checkout patterns
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' > "$RUNNER_TEMP/ace2-sparse-paths"
+          import json
+          with open("kernel/source-map.json",encoding="utf-8") as f:
+              m=json.load(f)
+          for path in sorted({v["kernel_path"] for v in m.values()}):
+              print("/"+path)
+          PY
+      - name: Clone reference SM8750 baseline at the original pinned SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --depth=1 --no-checkout \
+            --branch oneplus/sm8750_b_16.0.0_oneplus_13 \
+            https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8750.git \
+            "$RUNNER_TEMP/sm8750"
+          git -C "$RUNNER_TEMP/sm8750" sparse-checkout init --no-cone
+          git -C "$RUNNER_TEMP/sm8750" sparse-checkout set --no-cone --stdin < "$RUNNER_TEMP/ace2-sparse-paths"
+          git -C "$RUNNER_TEMP/sm8750" fetch --depth 1 origin d50b305f7da9e14715a25120a4ac7b1a4b8b97c3
+          git -C "$RUNNER_TEMP/sm8750" checkout --detach d50b305f7da9e14715a25120a4ac7b1a4b8b97c3
+      - name: Clone official OnePlus Ace 2 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --depth=1 --no-checkout \
+            --branch oneplus/sm8475_v_15.0.0_ace_2 \
+            https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8475.git \
+            "$RUNNER_TEMP/sm8475"
+          git -C "$RUNNER_TEMP/sm8475" sparse-checkout init --no-cone
+          git -C "$RUNNER_TEMP/sm8475" sparse-checkout set --no-cone --stdin < "$RUNNER_TEMP/ace2-sparse-paths"
+          git -C "$RUNNER_TEMP/sm8475" checkout HEAD
+      - name: Attempt safe read-only three-way merges
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ace2-port-overlays.py \
+            --donor "$GITHUB_WORKSPACE" \
+            --sm8750-base "$RUNNER_TEMP/sm8750" \
+            --ace2 "$RUNNER_TEMP/sm8475" \
+            --report-dir "$RUNNER_TEMP/ace2-merge"
+      - name: Upload detailed port blockers
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ace2-qualcomm-merge-preview
+          if-no-files-found: warn
+          retention-days: 14
+          path: ${{ runner.temp }}/ace2-merge/**
