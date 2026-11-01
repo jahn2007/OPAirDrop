@@ -23,6 +23,11 @@ echo "ACE2_SOURCE_AUDIT_BEGIN"
 python3 "$PORT/tools/ace2-source-audit.py" --source "$ROOT/platform" --json \
   > "$ROOT/reports/source-audit.json"
 python3 "$PORT/tools/ace2-source-audit.py" --source "$ROOT/platform"
+if [[ "${ACE2_APPLY_MODE_PATCH:-0}" == 1 ]]; then
+  echo "ACE2_APPLY_PAS_HOST_QDF_PATCH"
+  python3 "$PORT/tools/ace2-port-core.py" --source "$ROOT/platform" \
+    --report "$ROOT/reports/pas-host-mode.json"
+fi
 echo "ACE2_BASELINE_BUILD_BEGIN"
 # The published OnePlus 15.0 kernel script accepts waipio/gki.
 # It builds its own vendor modules and may need a large Linux runner.
