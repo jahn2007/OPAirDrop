@@ -85,7 +85,7 @@ jobs:
             --ace2 "$RUNNER_TEMP/sm8475" \
             --report-dir "$RUNNER_TEMP/ace2-merge/staged" \
             --write --safe-only
-          git -C "$RUNNER_TEMP/sm8475" add -A vendor/qcom/opensource/wlan
+          git -C "$RUNNER_TEMP/sm8475" add --sparse -A vendor/qcom/opensource/wlan
           git -C "$RUNNER_TEMP/sm8475" diff --cached --check
           git -C "$RUNNER_TEMP/sm8475" diff --cached --binary > "$RUNNER_TEMP/ace2-merge/ace2-safe-source.patch"
           test -s "$RUNNER_TEMP/ace2-merge/ace2-safe-source.patch"
