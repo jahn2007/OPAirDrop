@@ -21,6 +21,11 @@ FILES = {
     "qca-wifi-host-cmn/dp/inc/cdp_txrx_cmn_struct.h": [
         ("\twlan_op_mode_ndi,\n", "\twlan_op_mode_ndi,\n\twlan_op_mode_passthru,\n")
     ],
+    "qcacld-3.0/Kbuild": [
+        ("include $(WLAN_ROOT)/configs/$(CONFIG_QCA_CLD_WLAN_PROFILE)_defconfig\\n",
+         "include $(WLAN_ROOT)/configs/$(CONFIG_QCA_CLD_WLAN_PROFILE)_defconfig\\n"
+         "ccflags-$(CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE) += -DOPAIRSHARE_ACE2_PAS_BRIDGE\\n")
+    ],
     "qcacld-3.0/Kconfig": [
         ("endif # QCA_CLD_WLAN\n",
          'config OPAIRSHARE_ACE2_PAS_BRIDGE\n\tbool "OPAirDrop Ace 2 PAS/NDI host bridge"\n'
@@ -57,10 +62,22 @@ def main():
             if after not in text and text.count(before)!=1:
                 raise SystemExit(f"Refuse partial edits: invalid anchor {rel}: {before!r}")
         tasks.append((p,rel,replacements))
+    # Copy exact classifier shared by C host tests and adapted WMI TX bridge.
+    header = Path(__file__).resolve().parent.parent / "kernel/ace2/wlan_hdd_opairshare_frame.h"
+    header_dest = (root/ROOT/"qcacld-3.0/core/wma/src/ace2_awdl_frame.h").resolve()
+    if not header.is_file() or not header_dest.is_relative_to(root):
+        raise SystemExit("Missing classifier source or unsafe installation path")
+    if header_dest.exists() and header_dest.read_bytes() != header.read_bytes():
+        raise SystemExit("Refuse overwriting an unknown existing AWDL header")
     result=[]
     for p,rel,replacements in tasks:
         for before,after in replacements:
             result.append({"file":str(ROOT/rel),"status":patch_once(p,before,after,x.dry_run)})
+    if not x.dry_run:
+        header_dest.parent.mkdir(parents=True,exist_ok=True)
+        header_dest.write_bytes(header.read_bytes())
+    result.append({"file":str(header_dest.relative_to(root)),
+                   "status":"would-copy" if x.dry_run else "copied"})
     report={"platform":"oneplus_ace2_sm8475","changes":result,
             "feature_enabled":False,"kernel_module_compiled":False,"airdrop_verified":False}
     print(json.dumps(report,indent=2))
