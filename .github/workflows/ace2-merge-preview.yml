@@ -61,7 +61,7 @@ jobs:
             --donor "$GITHUB_WORKSPACE" \
             --sm8750-base "$RUNNER_TEMP/sm8750" \
             --ace2 "$RUNNER_TEMP/sm8475" \
-            --report-dir "$RUNNER_TEMP/ace2-merge" \\
+            --report-dir "$RUNNER_TEMP/ace2-merge" \
             --preview-base-drift
       - name: Upload detailed port blockers
         if: always()
