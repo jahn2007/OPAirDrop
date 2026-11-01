@@ -107,6 +107,9 @@ def main() -> int:
     print("Source overlays:", summary["source_mapped_files"])
     print("Clean source merges:", summary["clean"])
     print("Unresolved:", summary["unresolved"])
+    for entry in entries:
+        if entry["status"] not in ("clean-merged", "new-platform-source", "skipped-architecture-incompatible"):
+            print("BLOCKER", entry["status"], entry["source"], "->", entry["target"])
     print("Report:", report_dir / "ace2-overlay-merge.json")
     if failures:
         raise SystemExit("Refused to claim port success: unresolved source merges")
