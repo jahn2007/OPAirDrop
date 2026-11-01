@@ -1,0 +1,91 @@
+name: OnePlus Ace 2 — SM8475 source and kernel baseline
+
+on:
+  workflow_dispatch:
+    inputs:
+      full_kernel:
+        description: 'Sync and compile official SM8475 kernel (large disk/CPU required)'
+        type: boolean
+        default: true
+  push:
+    branches: [feat/oneplus-ace2-sm8475]
+    paths:
+      - 'platforms/oneplus-ace2/**'
+      - 'tools/ace2-*.py'
+      - 'tools/ace2-build-baseline.sh'
+      - '.github/workflows/ace2-kernel.yml'
+  pull_request:
+    paths:
+      - 'platforms/oneplus-ace2/**'
+      - 'tools/ace2-*.py'
+      - 'tools/ace2-build-baseline.sh'
+      - '.github/workflows/ace2-kernel.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ace2-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Python tools
+        run: |
+          python3 -m py_compile tools/ace2-source-audit.py tools/ace2-artifact-report.py
+          bash -n tools/ace2-build-baseline.sh
+      - name: Clone public OnePlus Ace 2 vendor source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth=1 --single-branch \
+            --branch oneplus/sm8475_v_15.0.0_ace_2 \
+            https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8475.git \
+            "$RUNNER_TEMP/ace2-vendor"
+          git -C "$RUNNER_TEMP/ace2-vendor" rev-parse HEAD > "$RUNNER_TEMP/source-revision.txt"
+          python3 tools/ace2-source-audit.py --source "$RUNNER_TEMP/ace2-vendor" --json > "$RUNNER_TEMP/source-audit.json"
+      - name: Upload audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ace2-vendor-source-audit
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/source-audit.json
+            ${{ runner.temp }}/source-revision.txt
+  kernel-baseline:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_kernel
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free space and install build requirements
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache /usr/share/dotnet /usr/local/share/powershell || true
+          sudo apt-get update
+          sudo apt-get install -y git git-lfs curl python3 rsync unzip zip bc bison flex libssl-dev \
+             libelf-dev libncurses-dev cpio lz4 zstd dwarves kmod jq
+          df -h .
+      - name: Sync official Ace 2 kernel and compile baseline modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ACE2_PORT_ROOT="$GITHUB_WORKSPACE"
+          export ACE2_BUILD_ROOT="$RUNNER_TEMP/ace2"
+          bash tools/ace2-build-baseline.sh
+      - name: Upload source lock, kernel-module inventory, failure logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ace2-kernel-baseline-reports
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/ace2/reports/**
+            ${{ runner.temp }}/ace2/platform/LOGDIR/*.log
