@@ -45,8 +45,8 @@ def main():
     arg.add_argument("--report",type=Path)
     x=arg.parse_args()
     root=x.source.resolve()
-    if not (root/"kernel_platform").is_dir():
-        raise SystemExit("Expected OnePlusOSS platform checkout; refusing edits")
+    if not (root/ROOT/"qcacld-3.0/Kbuild").is_file():
+        raise SystemExit("Expected official OnePlusOSS WLAN source tree; refusing edits")
     tasks=[]
     for rel, replacements in FILES.items():
         p=(root/ROOT/rel).resolve()
