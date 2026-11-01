@@ -54,8 +54,16 @@ def main() -> int:
         if not source.is_file():
             status["status"] = "missing-donor"
             failures += 1
+        elif not ancestor.is_file() and not destination.is_file():
+            # A genuinely new adapter/header can be copied; it still requires
+            # a separate build to prove its dependencies exist on Lithium.
+            status["status"] = "new-platform-source"
+            status["changed"] = True
+            if args.write:
+                destination.parent.mkdir(parents=True,exist_ok=True)
+                destination.write_bytes(source.read_bytes())
         elif not ancestor.is_file():
-            status["status"] = "missing-reference-base"
+            status["status"] = "no-common-ancestor"
             failures += 1
         elif not destination.is_file():
             status["status"] = "missing-target"
@@ -89,7 +97,7 @@ def main() -> int:
     summary = {"device":"OnePlus Ace 2 SM8475", "applied": args.write,
         "firmware_verified":False,"runtime_usable":False,
         "source_mapped_files":len(entries),
-        "clean":sum(e["status"]=="clean-merged" for e in entries),
+        "clean":sum(e["status"] in ("clean-merged","new-platform-source") for e in entries),
         "unresolved":failures,
         "entries":entries}
     (report_dir/"ace2-overlay-merge.json").write_text(
