@@ -13,6 +13,8 @@ on:
       - 'platforms/oneplus-ace2/**'
       - 'tools/ace2-*.py'
       - 'tools/ace2-build-baseline.sh'
+      - 'kernel/ace2/**'
+      - 'tests/ace2-frame-test.c'
       - '.github/workflows/ace2-kernel.yml'
   pull_request:
     paths:
@@ -36,7 +38,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate Python tools
         run: |
-          python3 -m py_compile tools/ace2-source-audit.py tools/ace2-artifact-report.py
+          python3 -m py_compile tools/ace2-source-audit.py tools/ace2-artifact-report.py tools/ace2-port-core.py
+          gcc -std=c11 -Wall -Wextra -Werror -pedantic -O2 -o "$RUNNER_TEMP/ace2-frame-test" tests/ace2-frame-test.c
+          "$RUNNER_TEMP/ace2-frame-test"
           bash -n tools/ace2-build-baseline.sh
       - name: Clone public OnePlus Ace 2 vendor source
         shell: bash
@@ -48,6 +52,22 @@ jobs:
             "$RUNNER_TEMP/ace2-vendor"
           git -C "$RUNNER_TEMP/ace2-vendor" rev-parse HEAD > "$RUNNER_TEMP/source-revision.txt"
           python3 tools/ace2-source-audit.py --source "$RUNNER_TEMP/ace2-vendor" --json > "$RUNNER_TEMP/source-audit.json"
+      - name: Prepare real SM8475 QDF mode patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ace2-port-core.py --source "$RUNNER_TEMP/ace2-vendor" --dry-run
+          python3 tools/ace2-port-core.py --source "$RUNNER_TEMP/ace2-vendor" --report "$RUNNER_TEMP/pas-host-mode.json"
+          # Repeat application to prove our source rewrite is idempotent.
+          python3 tools/ace2-port-core.py --source "$RUNNER_TEMP/ace2-vendor"
+          git -C "$RUNNER_TEMP/ace2-vendor" diff --check
+          git -C "$RUNNER_TEMP/ace2-vendor" diff -- \
+            vendor/qcom/opensource/wlan/qca-wifi-host-cmn/qdf/inc/qdf_types.h \
+            vendor/qcom/opensource/wlan/qca-wifi-host-cmn/qdf/src/qdf_types.c \
+            vendor/qcom/opensource/wlan/qca-wifi-host-cmn/dp/inc/cdp_txrx_cmn_struct.h \
+            vendor/qcom/opensource/wlan/qcacld-3.0/Kconfig \
+            > "$RUNNER_TEMP/ace2-core-platform.patch"
+          test -s "$RUNNER_TEMP/ace2-core-platform.patch"
       - name: Upload audit
         if: always()
         uses: actions/upload-artifact@v4
@@ -57,6 +77,8 @@ jobs:
           path: |
             ${{ runner.temp }}/source-audit.json
             ${{ runner.temp }}/source-revision.txt
+            ${{ runner.temp }}/pas-host-mode.json
+            ${{ runner.temp }}/ace2-core-platform.patch
   kernel-baseline:
     if: github.event_name == 'workflow_dispatch' && inputs.full_kernel
     runs-on: ubuntu-24.04
