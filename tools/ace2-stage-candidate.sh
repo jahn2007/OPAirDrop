@@ -72,6 +72,9 @@ expected = {
 actual = {record["path"].removeprefix("vendor/qcom/opensource/wlan/") for record in critical["records"]}
 if actual != expected or not critical["written"]:
     raise SystemExit("Candidate bridge is not the expected three-file Lithium resolution")
+hdd = next(r for r in critical["records"] if r["path"].endswith("/wlan_hdd_tx_rx.c"))
+if hdd["resolved_conflicts"] != ["native-sm8475-hdd-preserved"]:
+    raise SystemExit("Refusing cross-generation HDD source transplant")
 for name in ("candidate-wma-hook.json", "candidate-hdd-hook.json"):
     with (root / name).open(encoding="utf-8") as f:
         report = json.load(f)
