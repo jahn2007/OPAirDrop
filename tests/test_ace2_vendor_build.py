@@ -10,10 +10,10 @@ SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "ace2-run-vendor-build.
 
 STUB = """#!/usr/bin/env bash
 printf 'target=%s variant=%s board=%s recomp=%s\\n' "$1" "$2" "$TARGET_BOARD_PLATFORM" "$RECOMPILE_KERNEL"
-if [[ "\${ACE2_MOCK_WLAN_LINE:-0}" == 1 ]]; then
+if [[ "${ACE2_MOCK_WLAN_LINE:-0}" == 1 ]]; then
   echo 'Kbuild: Overriding WLAN config with: CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE=y'
 fi
-exit "\${ACE2_MOCK_EXIT:-0}"
+exit "${ACE2_MOCK_EXIT:-0}"
 """
 
 
