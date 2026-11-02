@@ -42,8 +42,10 @@ class WlanBuildTests(unittest.TestCase):
         for p in (self.wlan / "Makefile", self.wlan / "Kbuild",
                   self.platform / "kernel_platform/common/Makefile",
                   self.kout / "include/generated/autoconf.h",
-                  self.kout / "include/config/auto.conf"):
+                  self.kout / "include/config/auto.conf",
+                  self.kout / "include/generated/utsrelease.h"):
             p.write_text("placeholder")
+        (self.kout / "include/generated/utsrelease.h").write_text('#define UTS_RELEASE "5.10.226"\\n')
         (self.kout / "Module.symvers").write_text("0x1\\tfake\\tvmlinux\\tEXPORT_SYMBOL\\n")
         (self.wlan / "Kbuild").write_text('ccflags-$(CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE) += -DOPAIRSHARE_ACE2_PAS_BRIDGE')
         (self.clang / "clang").write_text("#!/bin/sh\nexit 0\n")
@@ -52,7 +54,7 @@ class WlanBuildTests(unittest.TestCase):
         bindir.mkdir()
         for name, text in {
             "make": FAKE_MAKE,
-            "modinfo": "#!/bin/sh\necho '5.10.226 SMP mod_unload'\n",
+            "modinfo": "#!/bin/sh\necho \"${ACE2_TEST_MODINFO_VERSION:-5.10.226} SMP mod_unload\"\n",
             "readelf": "#!/bin/sh\necho 'ELF Header: AArch64'\n",
         }.items():
             p = bindir / name
@@ -123,6 +125,12 @@ class WlanBuildTests(unittest.TestCase):
         p = self.run_build()
         self.assertEqual(p.returncode, 2)
         self.assertIn("refusing Clang outside", p.stderr)
+
+    def test_mismatched_kernel_release_rejected(self):
+        self.env["ACE2_TEST_MODINFO_VERSION"] = "6.6.118"
+        p = self.run_build()
+        self.assertEqual(p.returncode, 2, p.stdout + p.stderr)
+        self.assertIn("module vermagic does not match", p.stderr)
 
     def test_rejects_invalid_parallelism_before_compiler(self):
         self.env["ACE2_WLAN_JOBS"] = "500"
