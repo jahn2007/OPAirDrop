@@ -22,9 +22,12 @@ FILES = {
         ("\twlan_op_mode_ndi,\n", "\twlan_op_mode_ndi,\n\twlan_op_mode_passthru,\n")
     ],
     "qcacld-3.0/Kbuild": [
-        ("include $(WLAN_ROOT)/configs/$(CONFIG_QCA_CLD_WLAN_PROFILE)_defconfig\n",
-         "include $(WLAN_ROOT)/configs/$(CONFIG_QCA_CLD_WLAN_PROFILE)_defconfig\n"
-         "ccflags-$(CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE) += -DOPAIRSHARE_ACE2_PAS_BRIDGE -DDRIVER_PASSTHRU_MODE\n")
+        # WLAN_CFG_OVERRIDE is evaluated *after* the profile include.
+        # Make expands the ccflags-$(...) variable name when it reads the
+        # assignment, so the Ace 2 flag MUST follow the override loop.
+        ('$(warning "Overriding WLAN config with: $(cfg)"))\n',
+         '$(warning "Overriding WLAN config with: $(cfg)"))\n'
+         'ccflags-$(CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE) += -DOPAIRSHARE_ACE2_PAS_BRIDGE -DDRIVER_PASSTHRU_MODE\n')
     ],
     "qcacld-3.0/Kconfig": [
         ("endif # QCA_CLD_WLAN\n",
