@@ -34,7 +34,9 @@ cd "$ROOT/platform"
 repo init --depth=1 --partial-clone --clone-filter=blob:limit=1m \
   -u https://github.com/OnePlusOSS/kernel_manifest \
   -b oneplus/sm8475 -m oneplus_ace2_v.xml
-repo sync -c --no-tags -j"${ACE2_SYNC_JOBS:-4}" --fail-fast
+export ACE2_SYNC_ROOT="$ROOT/platform"
+export ACE2_REPORT_ROOT="$ROOT/reports"
+bash "$PORT/tools/ace2-sync-kernel.sh"
 repo manifest -r -o "$ROOT/reports/source-lock.xml"
 echo "ACE2_SOURCE_AUDIT_BEGIN"
 python3 "$PORT/tools/ace2-source-audit.py" --source "$ROOT/platform" --json \
