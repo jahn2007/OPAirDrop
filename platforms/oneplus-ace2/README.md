@@ -77,3 +77,15 @@ No Ace 2 installer or Release is authorized by these steps.
 Current blockers are the remaining QCA6490 WMA/HDD/DP source differences,
 missing target paths, Linux 5.10 symbol/ABI reconciliation, full vendor kernel
 compilation, and (when the user authorizes hardware testing) firmware behavior.
+
+## Experimental native TX integration — 2026-11-02 continuation
+
+- `tools/ace2-port-wma-hook.py` adds a tightly anchored, idempotent feature-guarded include to the official SM8475 `wma_data.c`, after `wma_tx_packet()`. Merely staging a donor WMI header previously left it disconnected from compilation.
+- `tools/ace2-port-hdd-tx.py` stages a distinct `QDF_PASSTHRU_MODE` dispatch in the native `hdd_hard_start_xmit()`. Ordinary STA TX is left unchanged; PAS radiotap frames never silently fall into the Ethernet data path. The WMA TX bridge's BUSY return preserves skb ownership.
+- `tools/ace2-port-core.py` provides `DRIVER_PASSTHRU_MODE` and `OPAIRSHARE_ACE2_PAS_BRIDGE` C defines **only** for the opt-in `CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE` build, default disabled.
+- The donor WMA bridge normalizes Retry/Power-Management/More-Data bits **only for its type/subtype decisions** under the Ace 2 guard, preserving the actual radiotap/802.11 skb.
+- The separate experimental `tools/ace2-stage-candidate.sh` stages strict verified overlays and the three previously reviewed conflict candidates in a synced official 5.10 kernel checkout. It installs both native TX hooks after resolving the appropriate files. Unlike preview mode it is a compiler candidate, **not a validated driver**.
+- `.github/workflows/ace2-kernel.yml` now exposes manually dispatched `full_kernel=true, candidate_port=true`. For automated one-off diagnostics, commits tagged `[ace2-candidate-kernel]` also trigger the candidate build, while normal pushes continue to run the lightweight source tests. The candidate uses `WLAN_CFG_OVERRIDE=CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE=y` and retains compiler diagnostics. The exact effectiveness of this override and all vendor cross-generation APIs must be proven by the resulting build.
+- `ace2-merge-preview.yml` stages the WMA inclusion and HDD TX dispatch in its artifact, plus reports of remaining conflicting source files; it still does not compile a kernel module.
+
+**This is not a working or installable AirDrop release.** PAS vdev lifecycle, Wonder provider, WMI raw data completion, monitor receive path and firmware ACK behavior remain blockers. Never force-load an experimental WLAN binary into PHK110.
