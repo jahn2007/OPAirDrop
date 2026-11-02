@@ -80,6 +80,7 @@ class WlanBuildTests(unittest.TestCase):
         args = self.log.read_text()
         for required in ("ARCH=arm64", "LLVM=1", "M=" + str(self.wlan),
                          "CONFIG_QCA_CLD_WLAN=m",
+                         "CONFIG_CNSS_QCA6490=y",
                          "WLAN_CFG_OVERRIDE=CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE=y"):
             self.assertIn(required, args)
         self.assertTrue((self.reports / "wlan-sha256.txt").exists())
@@ -122,6 +123,13 @@ class WlanBuildTests(unittest.TestCase):
         p = self.run_build()
         self.assertEqual(p.returncode, 2)
         self.assertIn("refusing Clang outside", p.stderr)
+
+    def test_rejects_invalid_parallelism_before_compiler(self):
+        self.env["ACE2_WLAN_JOBS"] = "500"
+        p = self.run_build()
+        self.assertEqual(p.returncode, 2)
+        self.assertIn("invalid WLAN parallel compiler limit", p.stderr)
+        self.assertFalse(self.log.exists())
 
     def test_extra_symvers_must_exist(self):
         self.env["ACE2_WLAN_EXTRA_SYMBOLS"] = str(self.tmp / "missing.symvers")
