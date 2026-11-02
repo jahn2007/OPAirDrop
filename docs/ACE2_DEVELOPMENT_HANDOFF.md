@@ -411,3 +411,23 @@ Next: check the latest fast source and merge-preview CI; only after they pass tr
 - `tests/test_ace2_vendor_build.py`: updated default-LTO expectation and added regression proving no-LTO is rejected without launching the vendor build. Lightweight source audit passed at [41443973530](https://github.com/jahn2007/OPAirDrop/actions/runs/41443973530) after the test update.
 - The post-build artifact reporter still requires an actual `wlan.ko` and rejects GKI-only output. Cross-generation source unresolved mappings, target firmware, passthrough vdev life cycle, and on-device AirDrop remain **unverified**.
 - **Do not run another expensive kernel build solely because source-level CI is green**. Check this review and the next complete build's results first. No installable module or AirDrop release is established.
+
+## 2026-11-02 — requested complete deliverable: WLAN compiler gate and next integrated test
+
+The user has authorized continuing software development toward a **working native bidirectional AirDrop release**, not accepting green source-check jobs as a finished product. This does not by itself provide connected phone hardware or verify firmware behavior.
+
+**Actual engineering changes in this continuation:**
+- `tools/ace2-build-wlan.sh`: explicit QCACLD external-module build against `kernel_platform/common` and prepared output `kernel_platform/out/msm-waipio-waipio-gki/gki_kernel/common`, consuming the matching `Module.symvers`, using manifest-contained Clang and the native QCA6490 Lithium profile (`CONFIG_CNSS_QCA6490=y`). Candidate explicitly enables the PAS bridge via `WLAN_CFG_OVERRIDE`. Rejects missing/stale `wlan.ko`, bad ELF, non-AArch64 ELF, missing or mismatched `vermagic`, unknown toolchains, missing symbol dependencies and nonzero make exit. This is a compiler probe only, **not device-validated**.
+- `tools/ace2-build-baseline.sh`: follows the vendor GKI build with actual external WLAN build for explicit candidate runs, rather than assuming GKI kernel success means WLAN success.
+- `tools/ace2-compile-pipeline.sh`: records separate GKI and WLAN results. If the GKI official KMI check is known to fail solely with `__cfi_slowpath` **after** `Module.symvers` exists, it collects WLAN compiler diagnostics without ever marking the overall build successful. Unknown build failures remain fatal before WLAN.
+- `tests/test_ace2_build_wlan.py` and `tests/test_ace2_compile_pipeline.py`: fast mocked coverage of kernel-output requirements, module identity/ABI, QCA6490 flags, missing PAS override, unknown compiler, make errors, stale/missing module and KMI diagnostic continuation. The ordinary `ace2-kernel.yml` source-audit job now runs both suites plus shell parsing.
+- The initial new source-audit succeeded at [41446810183](https://github.com/jahn2007/OPAirDrop/actions/runs/41446810183), updated integration tests at [41447247022](https://github.com/jahn2007/OPAirDrop/actions/runs/41447247022), and updated vermagic tests at [41447399229](https://github.com/jahn2007/OPAirDrop/actions/runs/41447399229). These runs **skip** the expensive kernel job. They verify control logic, not actual driver compilation.
+- External symbol dependencies may still require additional vendor `Module.symvers` entries; `ACE2_WLAN_EXTRA_SYMBOLS` is an explicit, validated list. Do not invent or silently substitute missing symbol tables.
+
+**Next acceptance requirements before a release:**
+1. Candidate Actions must compile an actual `wlan.ko` (and pass the stock GKI KMI check) with the exact QCA6490 API and driver config. Inspect genuine C errors; do not patch arbitrary vendor APIs without source evidence.
+2. Port PAS/NDI vdev CREATE/START/STOP/DELETE, self peer, error rollback, WMI TX completion and Monitor RX into the native Lithium driver; qualify ACK behavior and mandatory regulatory controls.
+3. Build native Wonder/Mosey/OShare integration for ColorOS 15, ensuring the package installer selects a target-matched module and never reuses SM8750 artifacts.
+4. With explicit device-testing permission and a tested Wi-Fi rollback path, verify native AirDrop discovery + Android-to-Apple + Apple-to-Android small and large file transfer and SHA256 equality, repeat start/stop, error cleanup and Wi-Fi restore.
+5. Only then produce and sign a device-scoped distributable through GitHub Actions/Releases. The branch remains Draft; no finished Ace 2 APK/root module is claimed.
+
