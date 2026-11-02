@@ -357,3 +357,14 @@ Implemented and committed this continuation:
 
 Next: inspect the new Actions candidate build diagnostics and resolve each actual C/Kbuild/API failure; only then progress to Wonder, RX and firmware. Continue keeping the PR as Draft and without phone tests.
 
+
+## 15. 2026-11-02 — recovery of CodeLinaro compiler checkout failures
+
+- The experimental compile Action [#41417985517](https://github.com/jahn2007/OPAirDrop/actions/runs/41417985517) ended **failure**, before compilation: official repo manifest sync returned `Cannot initialize work tree for kernelplatform/prebuilts-master/clang/host/linux-x86`. Runner disk had 109 GB free **before** sync; that does not establish remaining space/IO/transport state at checkout.
+- A second preceding candidate [#41418079340](https://github.com/jahn2007/OPAirDrop/actions/runs/41418079340) likewise ended **failure**, but its failed project was the official pinned GCC worktree `kernelplatform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8`. Both are repo synchronization errors; neither run reached modified WLAN C compilation.
+- Official manifest `OnePlusOSS/kernel_manifest`, branch `oneplus/sm8475`, `oneplus_ace2_v.xml` pins Clang `0fc3d01a780023469b7acc18c56a9cf5099a6d6c` and GCC `c9f87ae369034b4942536a1c5bd62e4cd1d828e3`. Do not substitute an arbitrary host compiler.
+- Added `tools/ace2-sync-kernel.sh`, invoked from `tools/ace2-build-baseline.sh` immediately after `repo init`. It reduces initial synchronization to `-j2`, sets `--retry-fetches=3`, and, ONLY for those two exact known manifest compiler checkout failures, retries the corresponding checkout serially (`-j1`, at most two tries) before re-running full sync. Limits full-sync passes to three. It never uses `--force-checkout`, `--force-sync`, substitutes compilers, flashes, or changes the phone. Unknown repository failures stop immediately.
+- Every attempt and preflight/failure diagnosis is preserved in `$ACE2_BUILD_ROOT/reports/repo-sync-*.log` and `repo-sync-diagnostics-*.txt`; the artifact uploader runs `if: always()`. After successful sync, both toolchain HEAD revisions must match the official manifest pins. These checks do NOT establish working AirDrop.
+- Added mocked source synchronization regressions in `tests/test_ace2_sync_kernel.py` covering Clang checkout, GCC checkout, consecutive checkout failures, permanent failure, unknown failure, and a wrong Clang SHA; wired into source-audit Actions.
+- This is a **proposed recovery** for the exact observed failure class, not a proven upstream fix. The first *new* full candidate run must be examined for real sync completion, then real compiler diagnostics. Do not claim a kernel or AirDrop release based on source-audit success.
+
