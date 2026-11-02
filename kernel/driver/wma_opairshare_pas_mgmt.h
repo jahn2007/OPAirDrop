@@ -1364,6 +1364,10 @@ int opairshare_pas_mgmt_xmit(struct sk_buff *skb, struct wlan_objmgr_vdev *vdev,
 		    ace2_awdl_classify(frame, remaining) == ACE2_AWDL_REJECT)
 			goto invalid;
 	}
+	/* Compare frame type/subtype, not Retry/PM/More-Data flags. Keep
+	 * the original 802.11 header and its flags untouched in the skb.
+	 */
+	fc &= 0x00ff;
 #endif
 	if ((fc & IEEE80211_FCTL_FTYPE) != IEEE80211_FTYPE_MGMT) {
 		uint8_t llc[8];
