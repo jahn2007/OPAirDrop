@@ -67,6 +67,13 @@ export ACE2_PLATFORM_ROOT="$ROOT/platform"
 export ACE2_REPORT_ROOT="$ROOT/reports"
 bash "$PORT/tools/ace2-run-vendor-build.sh"
 echo "ACE2_BASELINE_BUILD_END"
+if [[ "${ACE2_COMPILE_CANDIDATE:-0}" == 1 ]]; then
+  echo "ACE2_WLAN_COMPILER_PROBE_BEGIN"
+  # The official GKI build does not itself prove that qcacld WLAN was
+  # compiled. Run the actual external module against its prepared output.
+  bash "$PORT/tools/ace2-build-wlan.sh"
+  echo "ACE2_WLAN_COMPILER_PROBE_END"
+fi
 # Save only provenance, ELF metadata and checksums, never boot images to artifacts by default.
 python3 "$PORT/tools/ace2-artifact-report.py" --root "$ROOT/platform" \
   --out "$ROOT/reports/build-artifacts.json"
