@@ -55,6 +55,31 @@ python3 "$PORT/tools/ace2-port-wma-hook.py" \
 python3 "$PORT/tools/ace2-port-hdd-tx.py" \
   --source "$PLATFORM" --report "$REPORT/candidate-hdd-hook.json" --write
 
+# Assert the disposable candidate really contains the audited hooks and only
+# the three scoped resolver outputs before letting the compiler see it.
+python3 - "$REPORT" <<'PY'
+import json
+from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+with (root / "candidate-critical.json").open(encoding="utf-8") as f:
+    critical = json.load(f)
+expected = {
+    "qca-wifi-host-cmn/target_if/mlme/vdev_mgr/src/target_if_vdev_mgr_rx_ops.c",
+    "qcacld-3.0/core/hdd/src/wlan_hdd_tx_rx.c",
+    "qcacld-3.0/core/wma/src/wma_dev_if.c",
+}
+actual = {record["path"].removeprefix("vendor/qcom/opensource/wlan/") for record in critical["records"]}
+if actual != expected or not critical["written"]:
+    raise SystemExit("Candidate bridge is not the expected three-file Lithium resolution")
+for name in ("candidate-wma-hook.json", "candidate-hdd-hook.json"):
+    with (root / name).open(encoding="utf-8") as f:
+        report = json.load(f)
+    if report["state"] not in ("staged", "already-staged"):
+        raise SystemExit(f"Unstaged native Ace 2 hook: {name}")
+print("ACE2_CANDIDATE_SOURCE_ASSERTIONS_PASS; build status remains unknown")
+PY
+
 # The build harness must explicitly enable this guard when requested;
 # there is no installer or runtime activation in this stage script.
 {
