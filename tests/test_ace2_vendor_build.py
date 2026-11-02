@@ -10,6 +10,7 @@ SCRIPT = Path(__file__).resolve().parents[1] / "tools" / "ace2-run-vendor-build.
 
 STUB = """#!/usr/bin/env bash
 printf 'target=%s variant=%s board=%s recomp=%s\\n' "$1" "$2" "$TARGET_BOARD_PLATFORM" "$RECOMPILE_KERNEL"
+printf 'LTO=%s\\n' "${LTO:-stock}"
 if [[ "${ACE2_MOCK_WLAN_LINE:-0}" == 1 ]]; then
   echo 'Kbuild: Overriding WLAN config with: CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE=y'
 fi
@@ -64,6 +65,23 @@ class VendorBuildTests(unittest.TestCase):
         self.env["ACE2_MOCK_WLAN_LINE"] = "1"
         result = self.run_build()
         self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_candidate_defaults_to_fast_non_release_lto(self):
+        self.env["ACE2_COMPILE_CANDIDATE"] = "1"
+        self.env["ACE2_MOCK_WLAN_LINE"] = "1"
+        self.env.pop("LTO", None)
+        result = self.run_build()
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("LTO=none", result.stdout)
+        self.assertIn("diagnostic_candidate_not_abi_verified=true",
+                      (self.reports / "build-invocation.txt").read_text())
+
+    def test_candidate_rejects_invalid_lto(self):
+        self.env["ACE2_COMPILE_CANDIDATE"] = "1"
+        self.env["ACE2_DIAGNOSTIC_LTO"] = "invalid"
+        result = self.run_build()
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("ACE2_UNSUPPORTED_DIAGNOSTIC_LTO", result.stdout)
 
     def test_missing_official_entrypoint_fails(self):
         self.entry.unlink()
