@@ -16,6 +16,7 @@ on:
       - 'kernel/ace2/**'
       - 'tests/ace2-frame-test.c'
       - 'tests/test_ace2_wma_hook.py'
+      - 'tests/test_ace2_hdd_tx.py'
       - '.github/workflows/ace2-kernel.yml'
   pull_request:
     paths:
@@ -39,8 +40,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate Python tools
         run: |
-          python3 -m py_compile tools/ace2-source-audit.py tools/ace2-artifact-report.py tools/ace2-port-core.py tools/ace2-port-overlays.py tools/ace2-resolve-core.py tools/ace2-port-wma-hook.py tests/test_ace2_wma_hook.py
+          python3 -m py_compile tools/ace2-source-audit.py tools/ace2-artifact-report.py tools/ace2-port-core.py tools/ace2-port-overlays.py tools/ace2-resolve-core.py tools/ace2-port-wma-hook.py tests/test_ace2_wma_hook.py tools/ace2-port-hdd-tx.py tests/test_ace2_hdd_tx.py
           python3 -m unittest discover -s tests -p 'test_ace2_wma_hook.py'
+          python3 -m unittest discover -s tests -p 'test_ace2_hdd_tx.py'
           gcc -std=c11 -Wall -Wextra -Werror -pedantic -O2 -o "$RUNNER_TEMP/ace2-frame-test" tests/ace2-frame-test.c
           "$RUNNER_TEMP/ace2-frame-test"
           bash -n tools/ace2-build-baseline.sh
