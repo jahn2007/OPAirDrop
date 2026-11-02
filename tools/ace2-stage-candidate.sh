@@ -5,7 +5,7 @@ set -euo pipefail
 PORT="$ACE2_PORT_ROOT"
 PLATFORM="$ACE2_PLATFORM_ROOT"
 REPORT="$ACE2_REPORT_ROOT"
-BASE="$REPORT/sm8750-base"
+BASE="$PLATFORM/../sm8750-base"
 mkdir -p "$REPORT"
 test -f "$PORT/kernel/source-map.json"
 test -f "$PLATFORM/vendor/qcom/opensource/wlan/qcacld-3.0/core/wma/src/wma_data.c"
