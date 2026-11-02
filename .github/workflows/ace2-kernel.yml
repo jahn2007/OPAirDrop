@@ -7,12 +7,17 @@ on:
         description: 'Sync and compile official SM8475 kernel (large disk/CPU required)'
         type: boolean
         default: true
+      candidate_port:
+        description: 'Experimental PAS/NDI WMA/HDD kernel compile; no device install'
+        type: boolean
+        default: false
   push:
     branches: [feat/oneplus-ace2-sm8475]
     paths:
       - 'platforms/oneplus-ace2/**'
       - 'tools/ace2-*.py'
       - 'tools/ace2-build-baseline.sh'
+      - 'tools/ace2-stage-candidate.sh'
       - 'kernel/ace2/**'
       - 'tests/ace2-frame-test.c'
       - 'tests/test_ace2_wma_hook.py'
@@ -23,6 +28,7 @@ on:
       - 'platforms/oneplus-ace2/**'
       - 'tools/ace2-*.py'
       - 'tools/ace2-build-baseline.sh'
+      - 'tools/ace2-stage-candidate.sh'
       - '.github/workflows/ace2-kernel.yml'
 
 permissions:
@@ -45,7 +51,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_ace2_hdd_tx.py'
           gcc -std=c11 -Wall -Wextra -Werror -pedantic -O2 -o "$RUNNER_TEMP/ace2-frame-test" tests/ace2-frame-test.c
           "$RUNNER_TEMP/ace2-frame-test"
-          bash -n tools/ace2-build-baseline.sh
+          bash -n tools/ace2-build-baseline.sh tools/ace2-stage-candidate.sh
       - name: Clone public OnePlus Ace 2 vendor source
         shell: bash
         run: |
@@ -85,7 +91,7 @@ jobs:
             ${{ runner.temp }}/pas-host-mode.json
             ${{ runner.temp }}/ace2-core-platform.patch
   kernel-baseline:
-    if: (github.event_name == 'workflow_dispatch' && inputs.full_kernel) || (github.event_name == 'push' && contains(github.event.head_commit.message, '[ace2-full-kernel]'))
+    if: (github.event_name == 'workflow_dispatch' && inputs.full_kernel) || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[ace2-full-kernel]') || contains(github.event.head_commit.message, '[ace2-candidate-kernel]')))
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
@@ -104,6 +110,7 @@ jobs:
         run: |
           set -euo pipefail
           export ACE2_APPLY_MODE_PATCH=1
+          export ACE2_COMPILE_CANDIDATE="${{ (github.event_name == 'workflow_dispatch' && inputs.candidate_port || (github.event_name == 'push' && contains(github.event.head_commit.message, '[ace2-candidate-kernel]'))) && '1' || '0' }}"
           export ACE2_PORT_ROOT="$GITHUB_WORKSPACE"
           export ACE2_BUILD_ROOT="$RUNNER_TEMP/ace2"
           bash tools/ace2-build-baseline.sh
