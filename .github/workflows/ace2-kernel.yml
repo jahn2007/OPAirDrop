@@ -155,6 +155,8 @@ jobs:
           export ACE2_PORT_ROOT="$GITHUB_WORKSPACE"
           export ACE2_BUILD_ROOT="$RUNNER_TEMP/ace2"
           export ACE2_SYNC_JOBS=2 # bounded parallel CodeLinaro sync; per-project recovery uses -j1
+          # Fast candidate C/API diagnostics only; never publish no-LTO binaries.
+          export ACE2_DIAGNOSTIC_LTO=none
           bash tools/ace2-build-baseline.sh
       - name: Upload source lock, kernel-module inventory, failure logs
         if: always()
