@@ -23,6 +23,7 @@ on:
       - 'tests/test_ace2_vendor_build.py'
       - 'tools/ace2-preflight-candidate.py'
       - 'tests/test_ace2_preflight_candidate.py'
+      - 'tests/test_ace2_artifact_report.py'
       - 'tests/test_ace2_sync_kernel.py'
       - 'kernel/ace2/**'
       - 'tests/ace2-frame-test.c'
@@ -40,6 +41,7 @@ on:
       - 'tests/test_ace2_vendor_build.py'
       - 'tools/ace2-preflight-candidate.py'
       - 'tests/test_ace2_preflight_candidate.py'
+      - 'tests/test_ace2_artifact_report.py'
       - 'tests/test_ace2_sync_kernel.py'
       - '.github/workflows/ace2-kernel.yml'
 
@@ -64,6 +66,7 @@ jobs:
           python3 -m unittest discover -s tests -p 'test_ace2_sync_kernel.py'
           python3 -m unittest discover -s tests -p 'test_ace2_vendor_build.py'
           python3 -m unittest discover -s tests -p 'test_ace2_preflight_candidate.py'
+          python3 -m unittest discover -s tests -p 'test_ace2_artifact_report.py'
           gcc -std=c11 -Wall -Wextra -Werror -pedantic -O2 -o "$RUNNER_TEMP/ace2-frame-test" tests/ace2-frame-test.c
           "$RUNNER_TEMP/ace2-frame-test"
           bash -n tools/ace2-build-baseline.sh tools/ace2-stage-candidate.sh tools/ace2-sync-kernel.sh tools/ace2-run-vendor-build.sh
