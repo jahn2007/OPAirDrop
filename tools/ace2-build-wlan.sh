@@ -75,6 +75,14 @@ MODULE="$WLAN/wlan.ko"
 modinfo -F vermagic "$MODULE" > "$REPORT/wlan-vermagic.txt" ||
   fail "modinfo rejected WLAN module"
 [[ -s "$REPORT/wlan-vermagic.txt" ]] || fail "empty WLAN vermagic"
+[[ -f "$KOUT/include/generated/utsrelease.h" ]] || fail "missing kernel UTS_RELEASE"
+uts_release="$(sed -n 's/^#define UTS_RELEASE "\([^"]*\)".*/\1/p' "$KOUT/include/generated/utsrelease.h")"
+[[ -n "$uts_release" ]] || fail "invalid kernel UTS_RELEASE"
+vermagic="$(cat "$REPORT/wlan-vermagic.txt")"
+[[ "$vermagic" == "$uts_release "* ]] ||
+  fail "module vermagic does not match prepared GKI release: expected $uts_release"
 readelf -h "$MODULE" > "$REPORT/wlan-elf-header.txt" || fail "invalid WLAN ELF"
+grep -Fq 'AArch64' "$REPORT/wlan-elf-header.txt" ||
+  fail "module is not AArch64 ELF"
 sha256sum "$MODULE" > "$REPORT/wlan-sha256.txt"
 echo "ACE2_WLAN_EXTERNAL_BUILD_SUCCESS (compile only, not radio/AirDrop validation)"
