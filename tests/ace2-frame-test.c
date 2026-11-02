@@ -16,11 +16,25 @@ static void check(void)
     assert(ace2_awdl_classify(pkt, 24) == ACE2_AWDL_PROBE_REQUEST);
     pkt[0] = 0xd0;
     assert(ace2_awdl_classify(pkt, 24) == ACE2_AWDL_REJECT);
-    assert(ace2_awdl_classify(pkt, 25) == ACE2_AWDL_ACTION);
+    assert(ace2_awdl_classify(pkt, 25) == ACE2_AWDL_REJECT);
+    assert(ace2_awdl_classify(pkt, 26) == ACE2_AWDL_ACTION);
+    pkt[1] = 0x08; /* 802.11 retry is a valid AWDL retransmission */
+    assert(ace2_awdl_classify(pkt, 26) == ACE2_AWDL_ACTION);
+    pkt[1] = 0x04; /* More Fragments: unsupported */
+    assert(ace2_awdl_classify(pkt, 26) == ACE2_AWDL_REJECT);
+    pkt[1] = 0x00;
+    pkt[22] = 0x01; /* Nonzero fragment number: unsupported */
+    assert(ace2_awdl_classify(pkt, 26) == ACE2_AWDL_REJECT);
+    pkt[22] = 0x00;
     pkt[0] = 0x88;
     assert(ace2_awdl_classify(pkt, 64) == ACE2_AWDL_REJECT);
     memcpy(pkt+26, llc, sizeof(llc));
     assert(ace2_awdl_classify(pkt, 34) == ACE2_AWDL_QOS_DATA);
+    pkt[1] = 0x08; /* QoS retransmission */
+    assert(ace2_awdl_classify(pkt, 34) == ACE2_AWDL_QOS_DATA);
+    pkt[1] = 0x80; /* Order/HT-control extends the QoS header */
+    assert(ace2_awdl_classify(pkt, 34) == ACE2_AWDL_REJECT);
+    pkt[1] = 0x00;
     pkt[1] = 0x01; /* To-DS data is not part of our AWDL bridge */
     assert(ace2_awdl_classify(pkt, 34) == ACE2_AWDL_REJECT);
     pkt[1] = 0x40; /* protected */
