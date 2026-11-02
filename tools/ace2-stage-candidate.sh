@@ -92,4 +92,5 @@ PY
   echo 'installable=false'
   echo 'required_make_override=CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE=y'
 } > "$REPORT/candidate-build-stage.txt"
-echo "ACE2_CANDIDATE_SOURCE_STAGED; NOT a proven WLAN module"
+echo "ACE2_CANDIDATE_SOURCE_STAGED: native SM8475 HDD retained and PAS-only hook checked"
+echo "ACE2_CANDIDATE_COMPILE_STATUS: pending; no WLAN module or AirDrop validation yet"
