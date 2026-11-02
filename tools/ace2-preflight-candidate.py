@@ -50,6 +50,11 @@ def validate(root: Path) -> dict:
             and "$(eval $(cfg))" in kbuild,
         "kbuild_bridge_defines": "ccflags-$(CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE)" in kbuild
             and "-DOPAIRSHARE_ACE2_PAS_BRIDGE -DDRIVER_PASSTHRU_MODE" in kbuild,
+        "kbuild_override_before_bridge_flags":
+            "$(eval $(cfg))" in kbuild
+            and "ccflags-$(CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE)" in kbuild
+            and kbuild.index("$(eval $(cfg))") <
+                kbuild.index("ccflags-$(CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE)"),
         "no_conflict_markers": all(
             "<<<<<<<" not in content and ">>>>>>>" not in content
             for content in src.values()
