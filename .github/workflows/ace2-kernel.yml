@@ -178,3 +178,17 @@ jobs:
           path: |
             ${{ runner.temp }}/ace2/reports/**
             ${{ runner.temp }}/ace2/platform/LOGDIR/*.log
+      - name: Summarize GKI and WLAN gates
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### OnePlus Ace 2 candidate compile (not installable)'
+            if [[ -f "$RUNNER_TEMP/ace2/reports/compile-stage-results.txt" ]]; then
+              sed 's/^/- /' "$RUNNER_TEMP/ace2/reports/compile-stage-results.txt"
+            else
+              echo '- Compilation did not reach both GKI/WLAN gate results; inspect uploaded logs.'
+            fi
+            echo '- Runtime AirDrop, firmware and Wi-Fi recovery: NOT VERIFIED'
+          } >> "$GITHUB_STEP_SUMMARY"
+
