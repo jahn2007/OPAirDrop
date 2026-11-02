@@ -25,9 +25,10 @@ if [[ "${ACE2_COMPILE_CANDIDATE:-0}" == 1 ]]; then
   # The official build/build.sh accepts LTO=full|thin|none.
   # Fast C/API diagnostics are explicitly NON-ABI, NON-RELEASE builds.
   # The final device-matched build MUST restore stock config and ABI checks.
-  export LTO="${ACE2_DIAGNOSTIC_LTO:-none}"
+  export LTO="${ACE2_DIAGNOSTIC_LTO:-thin}"
   case "$LTO" in
-    none|thin|full) ;;
+    thin|full) ;;
+    none) echo "ACE2_LTO_NONE_CFI_KMI_INCOMPATIBLE: __cfi_slowpath is required by stock symbol list" >&2; exit 2 ;;
     *) echo "ACE2_UNSUPPORTED_DIAGNOSTIC_LTO: $LTO" >&2; exit 2 ;;
   esac
 fi
@@ -48,6 +49,10 @@ bash kernel_platform/build/android/prepare_vendor.sh waipio gki \
 rc=${PIPESTATUS[0]}
 set -e
 if (( rc != 0 )); then
+  if grep -Fq 'Symbols missing from ksymtab:' "$REPORT/kernel-build.log" &&
+     grep -Fq ' - __cfi_slowpath' "$REPORT/kernel-build.log"; then
+    echo "ACE2_KMI_CFI_SYMBOL_MISSING: check LTO/CFI configuration against the official GKI ABI; do not bypass ABI verification" >&2
+  fi
   echo "ACE2_BASELINE_BUILD_FAILED exit_code=$rc" >&2
   exit "$rc"
 fi
