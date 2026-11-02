@@ -35,13 +35,19 @@ ace2_awdl_classify(const ace2_byte *p, size_t n)
     if (!p || n < 24 || n > 2304)
         return ACE2_AWDL_REJECT;
     fc = (unsigned int)p[0] | ((unsigned int)p[1] << 8);
-    /* Unsupported version, DS flags, protected and fragmented frames. */
-    if ((fc & 0x0003) || (fc & 0x0300) || (fc & 0x4000))
+    /* No nonzero 802.11 version, DS, More Fragments, Protected or Order/HTC. */
+    if ((fc & 0x0003) || (fc & 0x0300) || (fc & 0x0400) ||
+        (fc & 0x4000) || (fc & 0x8000))
         return ACE2_AWDL_REJECT;
+    /* Sequence Control's low four bits are the fragment number. */
+    if ((p[22] & 0x0f) != 0)
+        return ACE2_AWDL_REJECT;
+    /* Allow the normal Retry/Power Management/More Data flags. */
+    fc &= 0x00ff;
     if (fc == 0x0040)     /* Management / probe request */
         return ACE2_AWDL_PROBE_REQUEST;
     if (fc == 0x00d0)     /* Management / action */
-        return n >= 25 ? ACE2_AWDL_ACTION : ACE2_AWDL_REJECT;
+        return n >= 26 ? ACE2_AWDL_ACTION : ACE2_AWDL_REJECT;
     if (fc != 0x0088 || n < 34)
         return ACE2_AWDL_REJECT;
     /* 3-address QoS data: 24B MAC header + 2B QoS control + Apple LLC/SNAP */
