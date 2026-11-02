@@ -84,6 +84,25 @@ jobs:
             vendor/qcom/opensource/wlan/qcacld-3.0/Kconfig \
             > "$RUNNER_TEMP/ace2-core-platform.patch"
           test -s "$RUNNER_TEMP/ace2-core-platform.patch"
+      - name: Verify native SM8475 HDD TX staging against real vendor source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ace2-port-hdd-tx.py --source "$RUNNER_TEMP/ace2-vendor"
+          python3 tools/ace2-port-hdd-tx.py --source "$RUNNER_TEMP/ace2-vendor" \
+            --report "$RUNNER_TEMP/hdd-native-tx.json" --write
+          python3 tools/ace2-port-hdd-tx.py --source "$RUNNER_TEMP/ace2-vendor" --write
+          python3 - "$RUNNER_TEMP/ace2-vendor" <<'PY'
+          from pathlib import Path
+          import sys
+          p = Path(sys.argv[1]) / "vendor/qcom/opensource/wlan/qcacld-3.0/core/hdd/src/wlan_hdd_tx_rx.c"
+          data = p.read_text(encoding="utf-8")
+          assert "adapter->vdev ?" in data
+          assert "adapter->device_mode == QDF_PASSTHRU_MODE" in data
+          assert "netdev_tx_t hdd_hard_start_xmit_passthru(" not in data
+          assert data.count("opairshare_pas_mgmt_xmit(") == 2
+          PY
+          git -C "$RUNNER_TEMP/ace2-vendor" diff --check
       - name: Upload audit
         if: always()
         uses: actions/upload-artifact@v4
@@ -94,6 +113,7 @@ jobs:
             ${{ runner.temp }}/source-audit.json
             ${{ runner.temp }}/source-revision.txt
             ${{ runner.temp }}/pas-host-mode.json
+            ${{ runner.temp }}/hdd-native-tx.json
             ${{ runner.temp }}/ace2-core-platform.patch
   # An explicit [ace2-candidate-kernel] commit requests disposable compiler
   # diagnostics; never publish an unverified WLAN .ko as an installable module.
