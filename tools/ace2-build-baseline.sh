@@ -5,6 +5,23 @@ ROOT="${ACE2_BUILD_ROOT:-$PWD/ace2-build}"
 PORT="${ACE2_PORT_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
 REPO_TOOL="${ACE2_REPO_TOOL:-$ROOT/bin/repo}"
 mkdir -p "$ROOT/bin" "$ROOT/reports" "$ROOT/output"
+# Keep actionable failure diagnostics even if GitHub terminates the compiler.
+ace2_diagnostics() {
+  local rc=$?
+  trap - EXIT
+  {
+    echo "exit_code=$rc"
+    echo "build_root=$ROOT"
+    echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    df -h "$ROOT" || true
+    free -h || true
+    find "$ROOT/platform" -name 'Module.symvers' -o -name 'vmlinux' -o -name '*.ko' 2>/dev/null | head -100 || true
+  } > "$ROOT/reports/diagnostics.txt" 2>&1
+  exit "$rc"
+}
+trap ace2_diagnostics EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 if [ ! -x "$REPO_TOOL" ]; then
   curl -fsSL --retry 3 https://storage.googleapis.com/git-repo-downloads/repo -o "$REPO_TOOL"
   chmod 755 "$REPO_TOOL"
@@ -32,7 +49,19 @@ echo "ACE2_BASELINE_BUILD_BEGIN"
 # The published OnePlus 15.0 kernel script accepts waipio/gki.
 # It builds its own vendor modules and may need a large Linux runner.
 export OPLUS_EXTRA_KBUILD_ARGS="${OPLUS_EXTRA_KBUILD_ARGS:-}"
-bash kernel_platform/oplus/build/oplus_build_kernel.sh waipio gki
+# The vendor build may use this temporary output directory before creating it.
+mkdir -p "$ROOT/platform/out/target/product/taro/tmp"
+# Preserve the official build's output, including the last successful compiler step.
+set +e
+bash kernel_platform/oplus/build/oplus_build_kernel.sh waipio gki \
+  > >(tee "$ROOT/reports/kernel-build.stdout.log") \
+  2> >(tee "$ROOT/reports/kernel-build.stderr.log" >&2)
+build_rc=$?
+set -e
+if (( build_rc != 0 )); then
+  echo "ACE2_BASELINE_BUILD_FAILED exit_code=$build_rc" >&2
+  exit "$build_rc"
+fi
 echo "ACE2_BASELINE_BUILD_END"
 # Save only provenance, ELF metadata and checksums, never boot images to artifacts by default.
 python3 "$PORT/tools/ace2-artifact-report.py" --root "$ROOT/platform" \
