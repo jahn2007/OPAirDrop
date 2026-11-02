@@ -21,12 +21,24 @@ export TARGET_BOARD_PLATFORM=taro
 export ANDROID_PRODUCT_OUT="$ROOT/out/target/product/taro"
 export RECOMPILE_KERNEL=1
 export EXTRA_KBUILD_ARGS="--skip abl"
+if [[ "${ACE2_COMPILE_CANDIDATE:-0}" == 1 ]]; then
+  # The official build/build.sh accepts LTO=full|thin|none.
+  # Fast C/API diagnostics are explicitly NON-ABI, NON-RELEASE builds.
+  # The final device-matched build MUST restore stock config and ABI checks.
+  export LTO="${ACE2_DIAGNOSTIC_LTO:-none}"
+  case "$LTO" in
+    none|thin|full) ;;
+    *) echo "ACE2_UNSUPPORTED_DIAGNOSTIC_LTO: $LTO" >&2; exit 2 ;;
+  esac
+fi
 mkdir -p "$ANDROID_PRODUCT_OUT/tmp" LOGDIR
 {
   echo "entrypoint=kernel_platform/build/android/prepare_vendor.sh"
   echo "target=waipio"
   echo "variant=gki"
   echo "candidate=${ACE2_COMPILE_CANDIDATE:-0}"
+  echo "lto_mode=${LTO:-stock}"
+  echo "diagnostic_candidate_not_abi_verified=true"
   echo "wlan_cfg_override=${WLAN_CFG_OVERRIDE:-none}"
   echo "build_is_installable=false"
 } > "$REPORT/build-invocation.txt"
