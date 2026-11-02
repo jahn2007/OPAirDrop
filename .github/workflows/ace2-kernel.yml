@@ -22,6 +22,8 @@ on:
       - 'tools/ace2-run-vendor-build.sh'
       - 'tools/ace2-build-wlan.sh'
       - 'tests/test_ace2_build_wlan.py'
+      - 'tools/ace2-compile-pipeline.sh'
+      - 'tests/test_ace2_compile_pipeline.py'
       - 'tests/test_ace2_vendor_build.py'
       - 'tools/ace2-preflight-candidate.py'
       - 'tests/test_ace2_preflight_candidate.py'
@@ -42,6 +44,8 @@ on:
       - 'tools/ace2-run-vendor-build.sh'
       - 'tools/ace2-build-wlan.sh'
       - 'tests/test_ace2_build_wlan.py'
+      - 'tools/ace2-compile-pipeline.sh'
+      - 'tests/test_ace2_compile_pipeline.py'
       - 'tests/test_ace2_vendor_build.py'
       - 'tools/ace2-preflight-candidate.py'
       - 'tests/test_ace2_preflight_candidate.py'
@@ -64,17 +68,18 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate Python tools
         run: |
-          python3 -m py_compile tools/ace2-preflight-candidate.py tests/test_ace2_preflight_candidate.py tests/test_ace2_vendor_build.py tests/test_ace2_build_wlan.py tools/ace2-source-audit.py tools/ace2-artifact-report.py tools/ace2-port-core.py tools/ace2-port-overlays.py tools/ace2-resolve-core.py tools/ace2-port-wma-hook.py tests/test_ace2_wma_hook.py tools/ace2-port-hdd-tx.py tests/test_ace2_hdd_tx.py
+          python3 -m py_compile tools/ace2-preflight-candidate.py tests/test_ace2_preflight_candidate.py tests/test_ace2_vendor_build.py tests/test_ace2_build_wlan.py tests/test_ace2_compile_pipeline.py tools/ace2-source-audit.py tools/ace2-artifact-report.py tools/ace2-port-core.py tools/ace2-port-overlays.py tools/ace2-resolve-core.py tools/ace2-port-wma-hook.py tests/test_ace2_wma_hook.py tools/ace2-port-hdd-tx.py tests/test_ace2_hdd_tx.py
           python3 -m unittest discover -s tests -p 'test_ace2_wma_hook.py'
           python3 -m unittest discover -s tests -p 'test_ace2_hdd_tx.py'
           python3 -m unittest discover -s tests -p 'test_ace2_sync_kernel.py'
           python3 -m unittest discover -s tests -p 'test_ace2_vendor_build.py'
           python3 -m unittest discover -s tests -p 'test_ace2_build_wlan.py'
+          python3 -m unittest discover -s tests -p 'test_ace2_compile_pipeline.py'
           python3 -m unittest discover -s tests -p 'test_ace2_preflight_candidate.py'
           python3 -m unittest discover -s tests -p 'test_ace2_artifact_report.py'
           gcc -std=c11 -Wall -Wextra -Werror -pedantic -O2 -o "$RUNNER_TEMP/ace2-frame-test" tests/ace2-frame-test.c
           "$RUNNER_TEMP/ace2-frame-test"
-          bash -n tools/ace2-build-baseline.sh tools/ace2-stage-candidate.sh tools/ace2-sync-kernel.sh tools/ace2-run-vendor-build.sh tools/ace2-build-wlan.sh
+          bash -n tools/ace2-build-baseline.sh tools/ace2-stage-candidate.sh tools/ace2-sync-kernel.sh tools/ace2-run-vendor-build.sh tools/ace2-build-wlan.sh tools/ace2-compile-pipeline.sh
       - name: Clone public OnePlus Ace 2 vendor source
         shell: bash
         run: |
