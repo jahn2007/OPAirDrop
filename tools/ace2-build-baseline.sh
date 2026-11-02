@@ -45,6 +45,21 @@ if [[ "${ACE2_APPLY_MODE_PATCH:-0}" == 1 ]]; then
   python3 "$PORT/tools/ace2-port-core.py" --source "$ROOT/platform" \
     --report "$ROOT/reports/pas-host-mode.json"
 fi
+if [[ "${ACE2_COMPILE_CANDIDATE:-0}" == 1 ]]; then
+  if [[ "${ACE2_APPLY_MODE_PATCH:-0}" != 1 ]]; then
+    echo "Refuse candidate compilation without PAS host QDF definitions" >&2
+    exit 2
+  fi
+  echo "ACE2_CANDIDATE_STAGE_BEGIN"
+  export ACE2_PORT_ROOT="$PORT"
+  export ACE2_PLATFORM_ROOT="$ROOT/platform"
+  export ACE2_REPORT_ROOT="$ROOT/reports"
+  bash "$PORT/tools/ace2-stage-candidate.sh"
+  # Kbuild WLAN_CFG_OVERRIDE is explicitly consumed via its $(eval ...) loop.
+  # This only requests compiler validation, never device installation.
+  export WLAN_CFG_OVERRIDE="CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE=y"
+  echo "ACE2_CANDIDATE_COMPILE_REQUESTED"
+fi
 echo "ACE2_BASELINE_BUILD_BEGIN"
 # The published OnePlus 15.0 kernel script accepts waipio/gki.
 # It builds its own vendor modules and may need a large Linux runner.
