@@ -39,6 +39,7 @@ jobs:
             "vendor/qcom/opensource/wlan/qca-wifi-host-cmn/dp/inc/cdp_txrx_cmn_struct.h",
             "vendor/qcom/opensource/wlan/qcacld-3.0/Kbuild",
             "vendor/qcom/opensource/wlan/qcacld-3.0/Kconfig",
+            "vendor/qcom/opensource/wlan/qcacld-3.0/core/wma/src/wma_data.c",
           })
           for path in sorted(overlay_paths):
               print("/"+path)
