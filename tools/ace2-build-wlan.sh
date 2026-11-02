@@ -12,6 +12,7 @@ CANDIDATE="${ACE2_COMPILE_CANDIDATE:-0}"
 mkdir -p "$REPORT"
 fail() { echo "ACE2_WLAN_BUILD_BLOCKED: $*" >&2; exit 2; }
 [[ "$CANDIDATE" == 0 || "$CANDIDATE" == 1 ]] || fail "invalid candidate setting"
+[[ "${ACE2_WLAN_JOBS:-2}" =~ ^[1-8]$ ]] || fail "invalid WLAN parallel compiler limit"
 [[ -f "$WLAN/Makefile" && -f "$WLAN/Kbuild" ]] || fail "official qcacld-3.0 source missing"
 [[ -d "$WLAN/cmn" && -d "$ROOT/vendor/qcom/opensource/wlan/fw-api" ]] || fail "WLAN dependency source missing"
 [[ -f "$KSRC/Makefile" ]] || fail "kernel source missing"
@@ -51,10 +52,10 @@ rm -f "$WLAN/wlan.ko"
 echo ACE2_WLAN_EXTERNAL_BUILD_BEGIN
 set +e
 make -C "$KSRC" O="$KOUT" ARCH=arm64 LLVM=1 LLVM_IAS=1 \
-  M="$WLAN" modules MODNAME=wlan \
+  -j"${ACE2_WLAN_JOBS:-2}" M="$WLAN" modules MODNAME=wlan \
   WLAN_ROOT="$WLAN" WLAN_COMMON_ROOT=cmn WLAN_COMMON_INC="$WLAN/cmn" \
   WLAN_FW_API="$ROOT/vendor/qcom/opensource/wlan/fw-api" WLAN_PROFILE=default \
-  CONFIG_QCA_CLD_WLAN=m WLAN_CFG_OVERRIDE="${WLAN_CFG_OVERRIDE:-}" \
+  CONFIG_QCA_CLD_WLAN=m CONFIG_CNSS_QCA6490=y WLAN_CFG_OVERRIDE="${WLAN_CFG_OVERRIDE:-}" \
   KBUILD_EXTRA_SYMBOLS="$EXTRA_SYMBOLS" \
   2>&1 | tee "$REPORT/wlan-build.log"
 rc=${PIPESTATUS[0]}
