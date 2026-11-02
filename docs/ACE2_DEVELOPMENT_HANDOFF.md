@@ -337,3 +337,23 @@ Until then call it “candidate port”/“source work”/“experimental CI art
 - **Still blocked:** SM8475 PAS/NDI lifetime and WMI RAW 802.11 TX integration, Lithium monitor RX, Wonder/provider build, system integration, APK/root module, and user-authorized hardware transfer verification. No Apple AirDrop transfer is claimed.
 - Next engineering priority: reproducible standalone modified WLAN + Wonder compile, isolated from the extremely heavy whole-GKI LTO run; resolve native SM8475 source conflicts with the actual compiler diagnostics rather than promoting candidate text merges. Keep device installation/release gated.
 
+
+## 14. 2026-11-02 — continued SM8475 WMA/HDD native integration
+
+This development session started from the previously recorded head `30bace3ee888b50537bf60febbe2ba3d9738ef68`. Latest source-audit on that commit was [41415849293](https://github.com/jahn2007/OPAirDrop/actions/runs/41415849293) **success**; full kernel job was skipped.
+
+Implemented and committed this continuation:
+
+- `tools/ace2-port-wma-hook.py`: strict, repeatable real-source editing of original SM8475 `core/wma/src/wma_data.c`; inserts `wma_opairshare_pas_mgmt.h` immediately **after** the original `wma_tx_packet()`, gated on both `OPAIRSHARE_ACE2_PAS_BRIDGE` and `DRIVER_PASSTHRU_MODE`. Requires the actual donor bridge header to have been staged. Host tests `tests/test_ace2_wma_hook.py` fail closed on drift, missing header or duplicates.
+- `tools/ace2-port-hdd-tx.py`: guards and rewrites the original SM8475 `hdd_hard_start_xmit()` only within `QDF_PASSTHRU_MODE`: pass the skb to `opairshare_pas_mgmt_xmit`, return `NETDEV_TX_BUSY` without consuming skb when the native bridge signals backpressure, and drop PAS frames if the bridge refuses them instead of reinterpreting radiotap as STA Ethernet. Ordinary STA path unchanged. Unit tests in `tests/test_ace2_hdd_tx.py`.
+- `kernel/driver/wma_opairshare_pas_mgmt.h`: fixes Ace 2-specific Retry/Power-Management/More-Data-bit handling during packet type dispatch without rewriting the skb (commit `802f79f5`).
+- `tools/ace2-port-core.py`: the previously disabled bridge Kbuild flag now supplies **both** Ace 2 and `DRIVER_PASSTHRU_MODE` defines when the candidate option is explicitly enabled.
+- `.github/workflows/ace2-merge-preview.yml`: includes `wma_data.c` in sparse checkout; stages both WMA native include and the targeted HDD send dispatch; preserves unresolved cross-generation conflicts and candidate reports. The initial new workflow run [41416726952](https://github.com/jahn2007/OPAirDrop/actions/runs/41416726952) failed only because the sparse checkout did not yet contain `wma_data.c`, then was corrected. [41417286191](https://github.com/jahn2007/OPAirDrop/actions/runs/41417286191) completed **success**, including all three previous critical conflict candidates and new HDD TX hook, **source-level only**.
+- `tools/ace2-stage-candidate.sh` and `tools/ace2-build-baseline.sh`: can now assemble pinned SM8750/SM8475 source candidates in the **fully synced** official kernel tree, then request a *compiler* attempt with `WLAN_CFG_OVERRIDE=CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE=y`. Source base remains SHA-checked; only the three explicit conflict candidates are promoted. SM8750 clone is outside uploaded reports.
+- `.github/workflows/ace2-kernel.yml`: `workflow_dispatch` input `candidate_port` plus commit trigger `[ace2-candidate-kernel]`. Normal source-audit runs test HDD/WMA staging with no new phone operations; kernel build is explicitly gated.
+- `platforms/oneplus-ace2/README.md` updated with setup and limits.
+
+**Important:** The WMA/HDD code is staged in official source but has NOT yet passed a complete Ace 2 WLAN compiler/link test. It does not create a PAS netdev or provide a working Wonder provider. The remaining blocked Lithium DP/WMA/HDD mappings, firmware behavior, RX, mac80211/Wonder, ABI, ColorOS userspace and real Apple interoperability still require development.
+
+Next: inspect the new Actions candidate build diagnostics and resolve each actual C/Kbuild/API failure; only then progress to Wonder, RX and firmware. Continue keeping the PR as Draft and without phone tests.
+
