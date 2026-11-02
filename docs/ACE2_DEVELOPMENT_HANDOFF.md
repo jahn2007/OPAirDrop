@@ -324,3 +324,16 @@ Until then call it “candidate port”/“source work”/“experimental CI art
 - [Ace2 official vendor WLAN tree](https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8475/tree/oneplus/sm8475_v_15.0.0_ace_2/vendor/qcom/opensource/wlan)
 
 **Handoff accuracy:** snapshots of task status above were verified via connected GitHub API on 2026-11-02 UTC+8; an Actions job may have progressed since. When the head branch changes, obtain its latest commit ID rather than relying on the historical SHA above.
+
+## 13. 2026-11-02 resumed development — verified baseline failure and code updates
+
+- PR #1 remained an open Draft; starting head was `c3f9580f506799975413209af68b4769748d0187`.
+- Rechecked full kernel Actions run [41331361225](https://github.com/jahn2007/OPAirDrop/actions/runs/41331361225): **completed / failure**. Source-audit succeeded; kernel-baseline failed. Official manifest sync, PAS QDF staging, and many kernel C compilation steps completed. The compiler reached `LTO vmlinux.o`, then the hosted runner received a shutdown signal and exited 143. This is **not proof of a specific C/ABI failure** and not a successful baseline build. An earlier `mktemp` warning referred to the absent `out/target/product/taro/tmp` directory; it did not immediately stop compilation.
+- Modified `kernel/ace2/wlan_hdd_opairshare_frame.h` and `tests/ace2-frame-test.c`: explicitly reject unsupported More Fragments, nonzero fragment index, and Order/HTC frames; retain valid 802.11 Retry frames; Action management frame now requires at least two bytes of body. This is a host-side frame classifier change, not firmware TX/RX support.
+- Modified `tools/ace2-build-baseline.sh`: create vendor taro temporary build directory, capture separate stdout/stderr logs and exit diagnostics, and retain crash/interrupt summaries where a runner allows teardown.
+- Modified `.github/workflows/ace2-kernel.yml`: syntax-check all current Ace 2 Python port tools.
+- Commits in this continuation: `d9996463`, `cceb746e`, `861dfc46`, `cae12f4a`. Check live head and subsequent Actions independently.
+- **Build limitation:** these commits use the normal source-audit path; a green push does not mean the gated full-kernel job ran. Full-kernel compile and correct 5.10 KMI/ABI remain unverified.
+- **Still blocked:** SM8475 PAS/NDI lifetime and WMI RAW 802.11 TX integration, Lithium monitor RX, Wonder/provider build, system integration, APK/root module, and user-authorized hardware transfer verification. No Apple AirDrop transfer is claimed.
+- Next engineering priority: reproducible standalone modified WLAN + Wonder compile, isolated from the extremely heavy whole-GKI LTO run; resolve native SM8475 source conflicts with the actual compiler diagnostics rather than promoting candidate text merges. Keep device installation/release gated.
+
