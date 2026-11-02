@@ -34,24 +34,26 @@ def port(source: Path, write: bool) -> dict:
         raise ValueError("Unexpected WMA bridge header contents")
 
     data = target.read_text(encoding="utf-8")
-    if data.count("QDF_STATUS wma_tx_packet(") != 1 or data.count(ANCHOR) != 1:
-        raise ValueError("Unexpected SM8475 WMA function layout")
-    pos = data.index(ANCHOR)
+    staged_anchor = "\n}\n\n" + INCLUDE + "\n/**\n * wma_ds_peek_rx_packet_info() - peek rx packet info\n"
+    if data.count("QDF_STATUS wma_tx_packet(") != 1:
+        raise ValueError("Unexpected SM8475 WMA TX function layout")
+    if data.count(staged_anchor) == 1:
+        if data.count(INCLUDE) != 1:
+            raise ValueError("Duplicated WMA bridge include")
+        pos = data.index(staged_anchor)
+        state = "already-staged"
+    elif data.count(ANCHOR) == 1 and INCLUDE not in data:
+        if 'include "wma_opairshare_pas_mgmt.h"' in data:
+            raise ValueError("Unrecognized WMA bridge include; refusing duplicate")
+        pos = data.index(ANCHOR)
+        state = "staged" if write else "would-stage"
+        if write:
+            target.write_text(data.replace(ANCHOR, staged_anchor, 1), encoding="utf-8")
+    else:
+        raise ValueError("Unexpected SM8475 WMA hook anchor or existing include")
     start = data.index("QDF_STATUS wma_tx_packet(")
     if start > pos or "error:\n" not in data[start:pos]:
         raise ValueError("WMA bridge hook is not after wma_tx_packet")
-    if INCLUDE in data:
-        # Guard against duplicated or stale includes elsewhere in this unit.
-        if data.count(INCLUDE) != 1 or data.index(INCLUDE) != pos - len(INCLUDE) + 2:
-            raise ValueError("Existing WMA include is in an unexpected location")
-        state = "already-staged"
-    else:
-        if 'include "wma_opairshare_pas_mgmt.h"' in data:
-            raise ValueError("Unrecognized WMA bridge include; refusing duplicate")
-        data = data.replace(ANCHOR, "\n}\n\n" + INCLUDE + "\n/**\n * wma_ds_peek_rx_packet_info() - peek rx packet info\n", 1)
-        state = "staged" if write else "would-stage"
-        if write:
-            target.write_text(data, encoding="utf-8")
     return {
         "platform": "oneplus_ace2_sm8475",
         "source": str(target.relative_to(root)),
