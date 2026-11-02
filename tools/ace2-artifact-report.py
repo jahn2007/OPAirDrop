@@ -45,7 +45,13 @@ def main():
     print("Reported", len(mods), "modules to", args.out)
     if not mods:
         raise SystemExit("No kernel modules found; build output is incomplete")
-    if not any(("wlan" in m["path"].lower() or "qca_cld" in m["path"].lower()) for m in mods):
-        raise SystemExit("No Qualcomm WLAN module artifact found")
+    # Kbuild's official MODNAME for this QCACLD source is "wlan".
+    # A generic path substring (e.g. a WLAN platform helper) is insufficient
+    # evidence that the patched qcacld-3.0 driver was linked.
+    wlan = [m for m in mods if pathlib.Path(m["path"]).name == "wlan.ko"]
+    result["qcacld_wlan_found"] = bool(wlan)
+    args.out.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8")
+    if not wlan:
+        raise SystemExit("No qcacld-3.0 wlan.ko artifact found; candidate module not built")
 if __name__=="__main__":
     main()
