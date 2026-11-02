@@ -368,3 +368,18 @@ Next: inspect the new Actions candidate build diagnostics and resolve each actua
 - Added mocked source synchronization regressions in `tests/test_ace2_sync_kernel.py` covering Clang checkout, GCC checkout, consecutive checkout failures, permanent failure, unknown failure, and a wrong Clang SHA; wired into source-audit Actions.
 - This is a **proposed recovery** for the exact observed failure class, not a proven upstream fix. The first *new* full candidate run must be examined for real sync completion, then real compiler diagnostics. Do not claim a kernel or AirDrop release based on source-audit success.
 
+
+## 16. 2026-11-02 — native SM8475 HDD staging blocker fixed
+
+The new [full-kernel candidate run 41425700917](https://github.com/jahn2007/OPAirDrop/actions/runs/41425700917) **failed**, but it first successfully completed the official `repo sync` and validated **both manifest-pinned Clang and GCC HEADs**, proving the previous compiler worktree errors did not reproduce on this run. The full kernel never compiled: the stage script aborted at `tools/ace2-port-hdd-tx.py:76` with `Unexpected SM8475 HDD TX anchor or partial hook`.
+
+Root cause: `tools/ace2-resolve-core.py` wrote a three-way merged `wlan_hdd_tx_rx.c` based on the SM8750 donor, which had a different `hdd_hard_start_xmit()` layout and a separate `hdd_hard_start_xmit_passthru()`. The new minimal hook had been written for the **original SM8475** HDD path and (correctly) refused to overwrite that incompatible merged file.
+
+Resolution:
+- `tools/ace2-resolve-core.py` still parses the exact expected HDD merge conflict but now **preserves the original SM8475 HDD file** and records `native-sm8475-hdd-preserved`. The other two tightly scoped conflict candidates remain unchanged.
+- `tools/ace2-stage-candidate.sh` explicitly asserts that the resolver did not transplant the SM8750 HDD implementation; then applies the fail-closed `tools/ace2-port-hdd-tx.py` hook to that native SM8475 source.
+- `.github/workflows/ace2-kernel.yml` runs the HDD hook in `--dry-run`, `--write`, repeat-write modes against **real** OnePlusOSS SM8475 vendor source in source-audit CI, confirming the native `adapter->vdev` dispatch and no `hdd_hard_start_xmit_passthru` donor path.
+- [Source-audit run 41431949597](https://github.com/jahn2007/OPAirDrop/actions/runs/41431949597) and [merge-preview run 41431880033](https://github.com/jahn2007/OPAirDrop/actions/runs/41431880033) **passed**. These are source-level checks only.
+- A fresh actual full-kernel candidate attempt [41432075404](https://github.com/jahn2007/OPAirDrop/actions/runs/41432075404) was triggered by commit `06ccc1fb87a6944f9d359de37e2e0f6861e13c36`. The source-audit job passed. The full-kernel job was still running at the time of writing; check its final result separately.
+
+No kernel module, AirDrop usability, or successful Apple transfer is claimed. Remaining future compilation, linker, firmware, Wonder, RX, ABI, and runtime integration blockers still require actual validation. No device action or release.
