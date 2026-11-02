@@ -16,6 +16,8 @@ on:
       - 'tests/test_ace2_wma_hook.py'
       - 'tools/ace2-port-hdd-tx.py'
       - 'tests/test_ace2_hdd_tx.py'
+      - 'tools/ace2-preflight-candidate.py'
+      - 'tests/test_ace2_preflight_candidate.py'
 
 permissions:
   contents: read
@@ -107,7 +109,6 @@ jobs:
             | grep -F '+#include "wma_opairshare_pas_mgmt.h"'
           echo "Created a source patch with a guarded WMA TX integration point; NOT a compiled bridge."
       - name: Resolve three critical SM8475-specific WLAN conflict candidates
-        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -121,6 +122,9 @@ jobs:
             --report "$RUNNER_TEMP/ace2-merge/hdd-tx-hook.json" --write
           python3 tools/ace2-port-hdd-tx.py \
             --source "$RUNNER_TEMP/sm8475" --write
+          python3 tools/ace2-preflight-candidate.py \
+            --source "$RUNNER_TEMP/sm8475" \
+            --report "$RUNNER_TEMP/ace2-merge/candidate-preflight.json"
           git -C "$RUNNER_TEMP/sm8475" diff --check
           git -C "$RUNNER_TEMP/sm8475" diff --binary > "$RUNNER_TEMP/ace2-merge/critical-candidate-source.patch"
           test -s "$RUNNER_TEMP/ace2-merge/critical-candidate-source.patch"
