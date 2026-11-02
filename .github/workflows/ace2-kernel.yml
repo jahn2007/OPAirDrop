@@ -90,6 +90,8 @@ jobs:
             ${{ runner.temp }}/source-revision.txt
             ${{ runner.temp }}/pas-host-mode.json
             ${{ runner.temp }}/ace2-core-platform.patch
+  # An explicit [ace2-candidate-kernel] commit requests disposable compiler
+  # diagnostics; never publish an unverified WLAN .ko as an installable module.
   kernel-baseline:
     if: (github.event_name == 'workflow_dispatch' && inputs.full_kernel) || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[ace2-full-kernel]') || contains(github.event.head_commit.message, '[ace2-candidate-kernel]')))
     runs-on: ubuntu-24.04
