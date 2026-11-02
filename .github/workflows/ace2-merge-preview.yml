@@ -14,6 +14,8 @@ on:
       - 'tools/ace2-resolve-core.py'
       - 'tools/ace2-port-wma-hook.py'
       - 'tests/test_ace2_wma_hook.py'
+      - 'tools/ace2-port-hdd-tx.py'
+      - 'tests/test_ace2_hdd_tx.py'
 
 permissions:
   contents: read
@@ -114,6 +116,11 @@ jobs:
             --target-root "$RUNNER_TEMP/sm8475" \
             --report "$RUNNER_TEMP/ace2-merge/critical-candidate-report.json" \
             --write
+          python3 tools/ace2-port-hdd-tx.py \
+            --source "$RUNNER_TEMP/sm8475" \
+            --report "$RUNNER_TEMP/ace2-merge/hdd-tx-hook.json" --write
+          python3 tools/ace2-port-hdd-tx.py \
+            --source "$RUNNER_TEMP/sm8475" --write
           git -C "$RUNNER_TEMP/sm8475" diff --check
           git -C "$RUNNER_TEMP/sm8475" diff --binary > "$RUNNER_TEMP/ace2-merge/critical-candidate-source.patch"
           test -s "$RUNNER_TEMP/ace2-merge/critical-candidate-source.patch"
