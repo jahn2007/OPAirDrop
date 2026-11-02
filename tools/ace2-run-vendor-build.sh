@@ -61,4 +61,9 @@ if [[ "${ACE2_COMPILE_CANDIDATE:-0}" == 1 ]] &&
   echo "ACE2_CANDIDATE_WLAN_CFG_NOT_CONSUMED" >&2
   exit 3
 fi
+# A successful GKI build alone is not a WLAN driver build. Always defer
+# artifact/symbol checks to ace2-artifact-report.py before claiming success.
+if [[ "${ACE2_COMPILE_CANDIDATE:-0}" == 1 ]]; then
+  echo "ACE2_GKI_BUILD_PASSED_WLAN_MODULE_UNVERIFIED"
+fi
 echo "ACE2_VENDOR_BUILD_EXIT_SUCCESS (module verification still required)"
