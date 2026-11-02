@@ -111,6 +111,22 @@ def main() -> int:
         if not f.is_file() or not dst.is_file():
             raise SystemExit(f"Missing candidate or source: {rel}")
         data, resolved = resolve(rel, f.read_text(encoding="utf-8"))
+        if rel == "qcacld-3.0/core/hdd/src/wlan_hdd_tx_rx.c":
+            # This older SM8475 driver has a different HDD/adapter layout.
+            # A whole-file SM8750 3-way merge introduces donor PAS TX and
+            # newer deflink-only fields that the native Lithium WLAN lacks.
+            # Retain the native vendor TX implementation and stage only
+            # the minimal, guarded PAS dispatch in ace2-port-hdd-tx.py.
+            # We still parse the conflict above to detect upstream drift.
+            native = dst.read_text(encoding="utf-8")
+            if native.count("netdev_tx_t hdd_hard_start_xmit(") != 1:
+                raise ValueError("Missing unique native SM8475 HDD TX entry")
+            if "hdd_hard_start_xmit_passthru(" in native or (
+                "opairshare_pas_mgmt_xmit(" in native
+            ):
+                raise ValueError("Native SM8475 source unexpectedly has PAS TX")
+            data = native
+            resolved = ["native-sm8475-hdd-preserved"]
         staged[dst] = data
         records.append({"path":str(VENDOR/rel), "resolved_conflicts":resolved})
     if args.write:
