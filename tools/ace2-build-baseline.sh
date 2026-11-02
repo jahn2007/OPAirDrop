@@ -63,21 +63,49 @@ if [[ "${ACE2_COMPILE_CANDIDATE:-0}" == 1 ]]; then
   echo "ACE2_CANDIDATE_COMPILE_REQUESTED"
 fi
 echo "ACE2_BASELINE_BUILD_BEGIN"
-# The published OnePlus 15.0 kernel script accepts waipio/gki.
-# It builds its own vendor modules and may need a large Linux runner.
-export OPLUS_EXTRA_KBUILD_ARGS="${OPLUS_EXTRA_KBUILD_ARGS:-}"
-# The vendor build may use this temporary output directory before creating it.
-mkdir -p "$ROOT/platform/out/target/product/taro/tmp"
-# Preserve the official build's output, including the last successful compiler step.
+# OnePlus OSS oplus_build_kernel.sh is a non-strict logging wrapper: it sources
+# the absent vendor/oplus/kernel/prebuilt/vendorsetup.sh and pipes the actual
+# build through tee without pipefail. Run its real published build entrypoint
+# directly, with the same environment and strict propagation of its exit code.
+# This avoids a false green after prepare_vendor.sh has failed.
+test -f "$ROOT/platform/kernel_platform/build/android/prepare_vendor.sh" || {
+  echo "ACE2_BUILD_ENTRYPOINT_MISSING" >&2
+  exit 2
+}
+export TOPDIR="$ROOT/platform"
+export ANDROID_BUILD_TOP="$TOPDIR"
+export CHIPSET_COMPANY=QCOM
+export OPLUS_VND_BUILD_PLATFORM=SM8475
+export TARGET_BOARD_PLATFORM=taro
+export ANDROID_PRODUCT_OUT="$TOPDIR/out/target/product/$TARGET_BOARD_PLATFORM"
+export RECOMPILE_KERNEL=1
+export EXTRA_KBUILD_ARGS="--skip abl"
+mkdir -p "$ANDROID_PRODUCT_OUT/tmp" "$ROOT/platform/LOGDIR"
+{
+  echo "entrypoint=kernel_platform/build/android/prepare_vendor.sh"
+  echo "target=waipio"
+  echo "variant=gki"
+  echo "candidate=${ACE2_COMPILE_CANDIDATE:-0}"
+  echo "wlan_cfg_override=${WLAN_CFG_OVERRIDE:-none}"
+  echo "build_is_installable=false"
+} > "$ROOT/reports/build-invocation.txt"
+# tee is the *last* pipeline command, so preserve pipefail and PIPESTATUS.
+# Log the real exit code of prepare_vendor, not the final echo of its wrapper.
 set +e
-bash kernel_platform/oplus/build/oplus_build_kernel.sh waipio gki \
-  > >(tee "$ROOT/reports/kernel-build.stdout.log") \
-  2> >(tee "$ROOT/reports/kernel-build.stderr.log" >&2)
-build_rc=$?
+bash kernel_platform/build/android/prepare_vendor.sh waipio gki \
+  2>&1 | tee "$ROOT/reports/kernel-build.log"
+build_rc=${PIPESTATUS[0]}
 set -e
 if (( build_rc != 0 )); then
   echo "ACE2_BASELINE_BUILD_FAILED exit_code=$build_rc" >&2
   exit "$build_rc"
+fi
+if [[ "${ACE2_COMPILE_CANDIDATE:-0}" == 1 ]]; then
+  if ! grep -q 'Overriding WLAN config with: CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE=y' \
+      "$ROOT/reports/kernel-build.log"; then
+    echo "ACE2_CANDIDATE_WLAN_CFG_NOT_CONSUMED: no evidence WLAN Kbuild ran" >&2
+    exit 3
+  fi
 fi
 echo "ACE2_BASELINE_BUILD_END"
 # Save only provenance, ELF metadata and checksums, never boot images to artifacts by default.
