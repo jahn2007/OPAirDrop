@@ -72,9 +72,17 @@ class VendorBuildTests(unittest.TestCase):
         self.env.pop("LTO", None)
         result = self.run_build()
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("LTO=none", result.stdout)
+        self.assertIn("LTO=thin", result.stdout)
         self.assertIn("diagnostic_candidate_not_abi_verified=true",
                       (self.reports / "build-invocation.txt").read_text())
+
+    def test_candidate_rejects_no_lto_cfi_kmi_mismatch(self):
+        self.env["ACE2_COMPILE_CANDIDATE"] = "1"
+        self.env["ACE2_DIAGNOSTIC_LTO"] = "none"
+        result = self.run_build()
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("ACE2_LTO_NONE_CFI_KMI_INCOMPATIBLE", result.stdout)
+        self.assertFalse((self.reports / "kernel-build.log").exists())
 
     def test_candidate_rejects_invalid_lto(self):
         self.env["ACE2_COMPILE_CANDIDATE"] = "1"
