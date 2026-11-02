@@ -55,6 +55,11 @@ python3 "$PORT/tools/ace2-port-wma-hook.py" \
 python3 "$PORT/tools/ace2-port-hdd-tx.py" \
   --source "$PLATFORM" --report "$REPORT/candidate-hdd-hook.json" --write
 
+# Fail before multi-hour vmlinux LTO if a staged bridge header, native
+# dispatch, config override or PAS enum is not wired into official WLAN.
+python3 "$PORT/tools/ace2-preflight-candidate.py" \
+  --source "$PLATFORM" --report "$REPORT/candidate-preflight.json"
+
 # Assert the disposable candidate really contains the audited hooks and only
 # the three scoped resolver outputs before letting the compiler see it.
 python3 - "$REPORT" <<'PY'
