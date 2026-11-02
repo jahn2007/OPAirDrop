@@ -38,19 +38,17 @@ def main():
                 dig.update(block)
         mods.append({"path": str(module.relative_to(root)), "bytes":module.stat().st_size,
                      "sha256":dig.hexdigest(), "modinfo":read_modinfo(module)})
+    wlan = [m for m in mods if pathlib.Path(m["path"]).name == "wlan.ko"]
     result = {"platform":"oneplus_ace2_sm8475","modules_found":len(mods),
+              "qcacld_wlan_found":bool(wlan),
               "firmware_awdl_verified":False,"airdrop_working":False,"modules":mods}
     args.out.parent.mkdir(parents=True,exist_ok=True)
     args.out.write_text(json.dumps(result,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
     print("Reported", len(mods), "modules to", args.out)
     if not mods:
         raise SystemExit("No kernel modules found; build output is incomplete")
-    # Kbuild's official MODNAME for this QCACLD source is "wlan".
-    # A generic path substring (e.g. a WLAN platform helper) is insufficient
-    # evidence that the patched qcacld-3.0 driver was linked.
-    wlan = [m for m in mods if pathlib.Path(m["path"]).name == "wlan.ko"]
-    result["qcacld_wlan_found"] = bool(wlan)
-    args.out.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8")
+    # Official QCACLD Kbuild MODNAME=wlan. An unrelated WLAN platform helper
+    # artifact cannot establish that the modified driver compiled.
     if not wlan:
         raise SystemExit("No qcacld-3.0 wlan.ko artifact found; candidate module not built")
 if __name__=="__main__":
