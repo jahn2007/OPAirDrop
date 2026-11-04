@@ -15,6 +15,7 @@ on:
     branches: [feat/oneplus-ace2-sm8475]
     paths:
       - 'platforms/oneplus-ace2/**'
+      - 'docs/ACE2_DEVELOPMENT_HANDOFF.md'
       - 'tools/ace2-*.py'
       - 'tools/ace2-build-baseline.sh'
       - 'tools/ace2-stage-candidate.sh'
@@ -37,6 +38,7 @@ on:
   pull_request:
     paths:
       - 'platforms/oneplus-ace2/**'
+      - 'docs/ACE2_DEVELOPMENT_HANDOFF.md'
       - 'tools/ace2-*.py'
       - 'tools/ace2-build-baseline.sh'
       - 'tools/ace2-stage-candidate.sh'
@@ -188,6 +190,11 @@ jobs:
               sed 's/^/- /' "$RUNNER_TEMP/ace2/reports/compile-stage-results.txt"
             else
               echo '- Compilation did not reach both GKI/WLAN gate results; inspect uploaded logs.'
+            fi
+            if [[ -f "$RUNNER_TEMP/ace2/reports/wlan-build-invocation.txt" ]]; then
+              echo '- WLAN compiler provenance:'
+              grep -E '^(compiler|compiler_source|candidate|installable)=' \
+                "$RUNNER_TEMP/ace2/reports/wlan-build-invocation.txt" | sed 's/^/  - /'
             fi
             echo '- Runtime AirDrop, firmware and Wi-Fi recovery: NOT VERIFIED'
           } >> "$GITHUB_STEP_SUMMARY"
