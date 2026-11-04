@@ -46,7 +46,7 @@ def main():
     is_elf = qcacld.is_file() and qcacld.stat().st_size > 4
     if is_elf:
         with qcacld.open("rb") as f:
-            is_elf = f.read(4) == b"\\x7fELF"
+            is_elf = f.read(4) == b"\x7fELF"
     wlan = [m for m in mods if m["path"] == qcacld_rel.as_posix()] if is_elf else []
     result = {"platform":"oneplus_ace2_sm8475","modules_found":len(mods),
               "qcacld_wlan_found":bool(wlan),

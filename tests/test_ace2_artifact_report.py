@@ -32,7 +32,7 @@ class Ace2ArtifactTests(unittest.TestCase):
         self.assertFalse(json.loads(self.out.read_text())["qcacld_wlan_found"])
 
     def test_unrelated_wlan_module_cannot_falsely_pass(self):
-        (self.root / "kernel_platform" / "wlan.ko").write_bytes(b"\\x7fELFother")
+        (self.root / "kernel_platform" / "wlan.ko").write_bytes(b"\x7fELFother")
         result = self.execute()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertFalse(json.loads(self.out.read_text())["qcacld_wlan_found"])
@@ -40,7 +40,7 @@ class Ace2ArtifactTests(unittest.TestCase):
     def test_exact_wlan_module_is_identified(self):
         wlan = self.root / "vendor/qcom/opensource/wlan/qcacld-3.0/wlan.ko"
         wlan.parent.mkdir(parents=True)
-        wlan.write_bytes(b"\\x7fELFmodule-test-fixture")
+        wlan.write_bytes(b"\x7fELFmodule-test-fixture")
         result = self.execute()
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertTrue(json.loads(self.out.read_text())["qcacld_wlan_found"])
