@@ -24,20 +24,41 @@ if [[ "$CANDIDATE" == 1 ]]; then
   grep -Fq 'ccflags-$(CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE)' "$WLAN/Kbuild" ||
     fail "candidate PAS Kbuild flag not staged"
 fi
+# The official CodeLinaro project intentionally contains several clang-r*
+# prebuilts. Select the exact compiler actually used by prepare_vendor.sh,
+# as recorded in the successful GKI build log, never the first glob match.
+CLANG_ROOT="$ROOT/kernel_platform/prebuilts-master/clang/host/linux-x86"
 CLANG_BIN="${ACE2_CLANG_BIN:-}"
 if [[ -z "$CLANG_BIN" ]]; then
+  [[ -s "$REPORT/kernel-build.log" ]] ||
+    fail "cannot identify the official GKI Clang without kernel-build.log"
   shopt -s nullglob
-  clang_matches=("$ROOT"/kernel_platform/prebuilts-master/clang/host/linux-x86/clang-r*/bin/clang)
-  (( ${#clang_matches[@]} == 1 )) ||
-    fail "select the manifest-pinned clang with ACE2_CLANG_BIN (matches=${#clang_matches[@]})"
-  CLANG_BIN="$(dirname "${clang_matches[0]}")"
+  clang_matches=("$CLANG_ROOT"/clang-r*/bin/clang)
+  selected=()
+  for compiler in "${clang_matches[@]}"; do
+    compiler_dir="${compiler%/clang}"
+    if grep -Fq -- "$compiler_dir:" "$REPORT/kernel-build.log" ||
+       grep -Fq -- "$compiler_dir " "$REPORT/kernel-build.log"; then
+      selected+=("$compiler_dir")
+    fi
+  done
+  (( ${#selected[@]} == 1 )) ||
+    fail "GKI log must identify exactly one synced Clang (referenced=${#selected[@]}, installed=${#clang_matches[@]})"
+  CLANG_BIN="${selected[0]}"
 fi
 CLANG_BIN="$(realpath -m "$CLANG_BIN")"
-[[ -x "$CLANG_BIN/clang" ]] || fail "pinned Clang missing"
 case "$CLANG_BIN/" in
-  "$ROOT"/kernel_platform/prebuilts-master/clang/host/linux-x86/*) ;;
+  "$CLANG_ROOT"/clang-r*/bin/) ;;
   *) fail "refusing Clang outside the official synced source" ;;
 esac
+[[ -x "$CLANG_BIN/clang" ]] || fail "pinned Clang missing"
+# Even an explicit override must match the compiler used to prepare GKI.
+if [[ -s "$REPORT/kernel-build.log" ]] &&
+   ! grep -Fq -- "$CLANG_BIN:" "$REPORT/kernel-build.log" &&
+   ! grep -Fq -- "$CLANG_BIN " "$REPORT/kernel-build.log"; then
+  fail "WLAN Clang differs from the compiler in the official GKI build log"
+fi
+echo "ACE2_WLAN_COMPILER_MATCHED_GKI: $CLANG_BIN"
 EXTRA_SYMBOLS="${ACE2_WLAN_EXTRA_SYMBOLS:-}"
 for p in $EXTRA_SYMBOLS; do
   [[ -s "$p" ]] || fail "required external Module.symvers missing: $p"
@@ -45,7 +66,7 @@ done
 export PATH="$CLANG_BIN:$PATH"
 {
   printf 'kernel_source=%s\nkernel_output=%s\nwlan_source=%s\n' "$KSRC" "$KOUT" "$WLAN"
-  printf 'compiler=%s/clang\ncandidate=%s\nextra_symbols=%s\ninstallable=false\n' "$CLANG_BIN" "$CANDIDATE" "$EXTRA_SYMBOLS"
+  printf 'compiler=%s/clang\ncompiler_source=official_gki_build_log\ncandidate=%s\nextra_symbols=%s\ninstallable=false\n' "$CLANG_BIN" "$CANDIDATE" "$EXTRA_SYMBOLS"
 } > "$REPORT/wlan-build-invocation.txt"
 # Ensure an older .ko can never make a new compile appear successful.
 rm -f "$WLAN/wlan.ko"

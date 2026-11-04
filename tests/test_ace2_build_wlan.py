@@ -50,6 +50,16 @@ class WlanBuildTests(unittest.TestCase):
         (self.wlan / "Kbuild").write_text('ccflags-$(CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE) += -DOPAIRSHARE_ACE2_PAS_BRIDGE')
         (self.clang / "clang").write_text("#!/bin/sh\nexit 0\n")
         (self.clang / "clang").chmod(0o755)
+        # Official CodeLinaro prebuilt project contains multiple clang-r*
+        # directories. GKI build log, rather than glob order, is authoritative.
+        for version in ("clang-r111", "clang-r222", "clang-r333"):
+            other = self.clang.parent.parent / version / "bin"
+            other.mkdir(parents=True)
+            (other / "clang").write_text("#!/bin/sh\nexit 0\n")
+            (other / "clang").chmod(0o755)
+        self.reports.mkdir(parents=True)
+        (self.reports / "kernel-build.log").write_text(
+            f"PATH=/usr/bin:{self.clang}:/bin\n")
         bindir = self.tmp / "bin"
         bindir.mkdir()
         for name, text in {
@@ -88,6 +98,40 @@ class WlanBuildTests(unittest.TestCase):
         self.assertTrue((self.reports / "wlan-sha256.txt").exists())
         self.assertIn("installable=false",
                       (self.reports / "wlan-build-invocation.txt").read_text())
+
+    def test_selects_exact_gki_clang_from_multiple_synced_versions(self):
+        self.env.pop("ACE2_CLANG_BIN")
+        p = self.run_build()
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        invocation = (self.reports / "wlan-build-invocation.txt").read_text()
+        self.assertIn("compiler=" + str(self.clang / "clang"), invocation)
+        self.assertIn("compiler_source=official_gki_build_log", invocation)
+        self.assertIn("ACE2_WLAN_COMPILER_MATCHED_GKI", p.stdout)
+
+    def test_refuses_ambiguous_gki_compiler_log(self):
+        self.env.pop("ACE2_CLANG_BIN")
+        with (self.reports / "kernel-build.log").open("a") as f:
+            f.write("PATH=" + str(self.clang.parent.parent / "clang-r222/bin") + ":/bin\n")
+        p = self.run_build()
+        self.assertEqual(p.returncode, 2)
+        self.assertIn("exactly one synced Clang", p.stderr)
+        self.assertFalse(self.log.exists())
+
+    def test_refuses_missing_gki_compiler_log(self):
+        self.env.pop("ACE2_CLANG_BIN")
+        (self.reports / "kernel-build.log").unlink()
+        p = self.run_build()
+        self.assertEqual(p.returncode, 2)
+        self.assertIn("without kernel-build.log", p.stderr)
+        self.assertFalse(self.log.exists())
+
+    def test_refuses_explicit_mismatched_gki_compiler(self):
+        other = self.clang.parent.parent / "clang-r222/bin"
+        self.env["ACE2_CLANG_BIN"] = str(other)
+        p = self.run_build()
+        self.assertEqual(p.returncode, 2)
+        self.assertIn("differs from the compiler", p.stderr)
+        self.assertFalse(self.log.exists())
 
     def test_prepared_symbols_are_mandatory(self):
         (self.kout / "Module.symvers").unlink()

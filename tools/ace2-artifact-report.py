@@ -38,7 +38,16 @@ def main():
                 dig.update(block)
         mods.append({"path": str(module.relative_to(root)), "bytes":module.stat().st_size,
                      "sha256":dig.hexdigest(), "modinfo":read_modinfo(module)})
-    wlan = [m for m in mods if pathlib.Path(m["path"]).name == "wlan.ko"]
+    # The external-module stage writes exactly this output. A different
+    # wlan.ko elsewhere in GKI/vendor outputs is not evidence of the patched
+    # Lithium QCACLD module compiling.
+    qcacld_rel = pathlib.Path("vendor/qcom/opensource/wlan/qcacld-3.0/wlan.ko")
+    qcacld = root / qcacld_rel
+    is_elf = qcacld.is_file() and qcacld.stat().st_size > 4
+    if is_elf:
+        with qcacld.open("rb") as f:
+            is_elf = f.read(4) == b"\\x7fELF"
+    wlan = [m for m in mods if m["path"] == qcacld_rel.as_posix()] if is_elf else []
     result = {"platform":"oneplus_ace2_sm8475","modules_found":len(mods),
               "qcacld_wlan_found":bool(wlan),
               "firmware_awdl_verified":False,"airdrop_working":False,"modules":mods}
