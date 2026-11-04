@@ -54,21 +54,26 @@ class VendorBuildTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("ACE2_VENDOR_BUILD_EXIT_SUCCESS", result.stdout)
 
-    def test_candidate_rejects_missing_wlan_compilation(self):
+    def test_candidate_gki_success_without_wlan_kbuild_log(self):
+        # Official prepare_vendor compiles GKI/vendor pieces; the separate
+        # ace2-build-wlan.sh owns the PAS flag and actual wlan.ko checks.
         self.env["ACE2_COMPILE_CANDIDATE"] = "1"
+        self.env["WLAN_CFG_OVERRIDE"] = "CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE=y"
         result = self.run_build()
-        self.assertEqual(result.returncode, 3, result.stdout)
-        self.assertIn("ACE2_CANDIDATE_WLAN_CFG_NOT_CONSUMED", result.stdout)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("ACE2_GKI_BUILD_PASSED_WLAN_MODULE_UNVERIFIED", result.stdout)
+        self.assertNotIn("Overriding WLAN config", result.stdout)
 
-    def test_candidate_wlan_override_is_visible(self):
+    def test_candidate_vendor_does_not_claim_wlan_compilation(self):
         self.env["ACE2_COMPILE_CANDIDATE"] = "1"
         self.env["ACE2_MOCK_WLAN_LINE"] = "1"
         result = self.run_build()
         self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("ACE2_GKI_BUILD_PASSED_WLAN_MODULE_UNVERIFIED", result.stdout)
+        self.assertNotIn("ACE2_WLAN_EXTERNAL_BUILD_SUCCESS", result.stdout)
 
     def test_candidate_defaults_to_fast_non_release_lto(self):
         self.env["ACE2_COMPILE_CANDIDATE"] = "1"
-        self.env["ACE2_MOCK_WLAN_LINE"] = "1"
         self.env.pop("LTO", None)
         result = self.run_build()
         self.assertEqual(result.returncode, 0, result.stdout)

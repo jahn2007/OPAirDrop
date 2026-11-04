@@ -56,11 +56,11 @@ if (( rc != 0 )); then
   echo "ACE2_BASELINE_BUILD_FAILED exit_code=$rc" >&2
   exit "$rc"
 fi
-if [[ "${ACE2_COMPILE_CANDIDATE:-0}" == 1 ]] &&
-   ! grep -Fq 'Overriding WLAN config with: CONFIG_OPAIRSHARE_ACE2_PAS_BRIDGE=y' "$REPORT/kernel-build.log"; then
-  echo "ACE2_CANDIDATE_WLAN_CFG_NOT_CONSUMED" >&2
-  exit 3
-fi
+# This entrypoint builds the official GKI/vendor baseline, not the standalone
+# qcacld-3.0 module. Requiring a WLAN Kbuild warning here incorrectly fails
+# a successful GKI build before the separate WLAN compiler can even run.
+# The actual external WLAN build validates WLAN_CFG_OVERRIDE consumption and
+# the produced AArch64 wlan.ko in ace2-build-wlan.sh.
 # A successful GKI build alone is not a WLAN driver build. Always defer
 # artifact/symbol checks to ace2-artifact-report.py before claiming success.
 if [[ "${ACE2_COMPILE_CANDIDATE:-0}" == 1 ]]; then
