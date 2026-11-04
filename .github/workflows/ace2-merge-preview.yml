@@ -1,0 +1,139 @@
+name: OnePlus Ace 2 — cross-generation WLAN overlay merge
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/oneplus-ace2-sm8475]
+    paths:
+      - 'tools/ace2-port-overlays.py'
+      - '.github/workflows/ace2-merge-preview.yml'
+      - 'kernel/source-map.json'
+      - 'kernel/driver/**'
+      - 'kernel/ace2/**'
+      - 'tools/ace2-port-core.py'
+      - 'tools/ace2-resolve-core.py'
+      - 'tools/ace2-port-wma-hook.py'
+      - 'tests/test_ace2_wma_hook.py'
+      - 'tools/ace2-port-hdd-tx.py'
+      - 'tests/test_ace2_hdd_tx.py'
+      - 'tools/ace2-preflight-candidate.py'
+      - 'tests/test_ace2_preflight_candidate.py'
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare exact WLAN source sparse checkout patterns
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' > "$RUNNER_TEMP/ace2-sparse-paths"
+          import json
+          with open("kernel/source-map.json",encoding="utf-8") as f:
+              m=json.load(f)
+          overlay_paths = {v["kernel_path"] for v in m.values() if "kernel_path" in v}
+          overlay_paths.update({
+            "vendor/qcom/opensource/wlan/qca-wifi-host-cmn/qdf/inc/qdf_types.h",
+            "vendor/qcom/opensource/wlan/qca-wifi-host-cmn/qdf/src/qdf_types.c",
+            "vendor/qcom/opensource/wlan/qca-wifi-host-cmn/dp/inc/cdp_txrx_cmn_struct.h",
+            "vendor/qcom/opensource/wlan/qcacld-3.0/Kbuild",
+            "vendor/qcom/opensource/wlan/qcacld-3.0/Kconfig",
+            "vendor/qcom/opensource/wlan/qcacld-3.0/core/wma/src/wma_data.c",
+          })
+          for path in sorted(overlay_paths):
+              print("/"+path)
+          PY
+      - name: Clone reference SM8750 baseline at the original pinned SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --depth=1 --no-checkout \
+            --branch oneplus/sm8750_b_16.0.0_oneplus_13 \
+            https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8750.git \
+            "$RUNNER_TEMP/sm8750"
+          git -C "$RUNNER_TEMP/sm8750" sparse-checkout init --no-cone
+          git -C "$RUNNER_TEMP/sm8750" sparse-checkout set --no-cone --stdin < "$RUNNER_TEMP/ace2-sparse-paths"
+          git -C "$RUNNER_TEMP/sm8750" fetch --depth 1 origin d50b305f7da9e14715a25120a4ac7b1a4b8b97c3
+          git -C "$RUNNER_TEMP/sm8750" checkout --detach d50b305f7da9e14715a25120a4ac7b1a4b8b97c3
+      - name: Clone official OnePlus Ace 2 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --depth=1 --no-checkout \
+            --branch oneplus/sm8475_v_15.0.0_ace_2 \
+            https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8475.git \
+            "$RUNNER_TEMP/sm8475"
+          git -C "$RUNNER_TEMP/sm8475" sparse-checkout init --no-cone
+          git -C "$RUNNER_TEMP/sm8475" sparse-checkout set --no-cone --stdin < "$RUNNER_TEMP/ace2-sparse-paths"
+          git -C "$RUNNER_TEMP/sm8475" checkout HEAD
+      - name: Inspect conflicts and ancestor drift without source writes
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ace2-port-overlays.py \
+            --donor "$GITHUB_WORKSPACE" \
+            --sm8750-base "$RUNNER_TEMP/sm8750" \
+            --ace2 "$RUNNER_TEMP/sm8475" \
+            --report-dir "$RUNNER_TEMP/ace2-merge" \
+            --preview-base-drift
+      - name: Stage verified SM8750 overlays and native Ace 2 host definitions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ace2-port-core.py --source "$RUNNER_TEMP/sm8475" --report "$RUNNER_TEMP/ace2-merge/pas-host-mode.json"
+          python3 tools/ace2-port-overlays.py \
+            --donor "$GITHUB_WORKSPACE" \
+            --sm8750-base "$RUNNER_TEMP/sm8750" \
+            --ace2 "$RUNNER_TEMP/sm8475" \
+            --report-dir "$RUNNER_TEMP/ace2-merge/staged" \
+            --write --safe-only
+          # The overlay header is otherwise never compiled: install the
+          # explicit guarded WMA include after the native wma_tx_packet().
+          python3 tools/ace2-port-wma-hook.py \
+            --source "$RUNNER_TEMP/sm8475" \
+            --report "$RUNNER_TEMP/ace2-merge/wma-hook.json" --write
+          python3 tools/ace2-port-wma-hook.py \
+            --source "$RUNNER_TEMP/sm8475" --write
+          git -C "$RUNNER_TEMP/sm8475" add --sparse -A vendor/qcom/opensource/wlan
+          git -C "$RUNNER_TEMP/sm8475" diff --cached --check
+          git -C "$RUNNER_TEMP/sm8475" diff --cached --binary > "$RUNNER_TEMP/ace2-merge/ace2-safe-source.patch"
+          test -s "$RUNNER_TEMP/ace2-merge/ace2-safe-source.patch"
+          git -C "$RUNNER_TEMP/sm8475" diff --cached -- \
+            vendor/qcom/opensource/wlan/qcacld-3.0/core/wma/src/wma_data.c \
+            | grep -F '+#include "wma_opairshare_pas_mgmt.h"'
+          echo "Created a source patch with a guarded WMA TX integration point; NOT a compiled bridge."
+      - name: Resolve three critical SM8475-specific WLAN conflict candidates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ace2-resolve-core.py \
+            --conflict-root "$RUNNER_TEMP/ace2-merge/conflicts" \
+            --target-root "$RUNNER_TEMP/sm8475" \
+            --report "$RUNNER_TEMP/ace2-merge/critical-candidate-report.json" \
+            --write
+          python3 tools/ace2-port-hdd-tx.py \
+            --source "$RUNNER_TEMP/sm8475" \
+            --report "$RUNNER_TEMP/ace2-merge/hdd-tx-hook.json" --write
+          python3 tools/ace2-port-hdd-tx.py \
+            --source "$RUNNER_TEMP/sm8475" --write
+          python3 tools/ace2-preflight-candidate.py \
+            --source "$RUNNER_TEMP/sm8475" \
+            --report "$RUNNER_TEMP/ace2-merge/candidate-preflight.json"
+          git -C "$RUNNER_TEMP/sm8475" diff --check
+          git -C "$RUNNER_TEMP/sm8475" diff --binary > "$RUNNER_TEMP/ace2-merge/critical-candidate-source.patch"
+          test -s "$RUNNER_TEMP/ace2-merge/critical-candidate-source.patch"
+          echo "Candidate patch is not release-ready. Kernel compilation and human review required."
+      - name: Upload detailed port blockers
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ace2-qualcomm-merge-preview
+          if-no-files-found: warn
+          retention-days: 14
+          path: ${{ runner.temp }}/ace2-merge/**

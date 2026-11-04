@@ -1,0 +1,201 @@
+name: OnePlus Ace 2 — SM8475 source and kernel baseline
+
+on:
+  workflow_dispatch:
+    inputs:
+      full_kernel:
+        description: 'Sync and compile official SM8475 kernel (large disk/CPU required)'
+        type: boolean
+        default: true
+      candidate_port:
+        description: 'Experimental PAS/NDI WMA/HDD kernel compile; no device install'
+        type: boolean
+        default: false
+  push:
+    branches: [feat/oneplus-ace2-sm8475]
+    paths:
+      - 'platforms/oneplus-ace2/**'
+      - 'docs/ACE2_DEVELOPMENT_HANDOFF.md'
+      - 'tools/ace2-*.py'
+      - 'tools/ace2-build-baseline.sh'
+      - 'tools/ace2-stage-candidate.sh'
+      - 'tools/ace2-sync-kernel.sh'
+      - 'tools/ace2-run-vendor-build.sh'
+      - 'tools/ace2-build-wlan.sh'
+      - 'tests/test_ace2_build_wlan.py'
+      - 'tools/ace2-compile-pipeline.sh'
+      - 'tests/test_ace2_compile_pipeline.py'
+      - 'tests/test_ace2_vendor_build.py'
+      - 'tools/ace2-preflight-candidate.py'
+      - 'tests/test_ace2_preflight_candidate.py'
+      - 'tests/test_ace2_artifact_report.py'
+      - 'tests/test_ace2_sync_kernel.py'
+      - 'kernel/ace2/**'
+      - 'tests/ace2-frame-test.c'
+      - 'tests/test_ace2_wma_hook.py'
+      - 'tests/test_ace2_hdd_tx.py'
+      - '.github/workflows/ace2-kernel.yml'
+  pull_request:
+    paths:
+      - 'platforms/oneplus-ace2/**'
+      - 'docs/ACE2_DEVELOPMENT_HANDOFF.md'
+      - 'tools/ace2-*.py'
+      - 'tools/ace2-build-baseline.sh'
+      - 'tools/ace2-stage-candidate.sh'
+      - 'tools/ace2-sync-kernel.sh'
+      - 'tools/ace2-run-vendor-build.sh'
+      - 'tools/ace2-build-wlan.sh'
+      - 'tests/test_ace2_build_wlan.py'
+      - 'tools/ace2-compile-pipeline.sh'
+      - 'tests/test_ace2_compile_pipeline.py'
+      - 'tests/test_ace2_vendor_build.py'
+      - 'tools/ace2-preflight-candidate.py'
+      - 'tests/test_ace2_preflight_candidate.py'
+      - 'tests/test_ace2_artifact_report.py'
+      - 'tests/test_ace2_sync_kernel.py'
+      - '.github/workflows/ace2-kernel.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ace2-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Python tools
+        run: |
+          python3 -m py_compile tools/ace2-preflight-candidate.py tests/test_ace2_preflight_candidate.py tests/test_ace2_vendor_build.py tests/test_ace2_build_wlan.py tests/test_ace2_compile_pipeline.py tools/ace2-source-audit.py tools/ace2-artifact-report.py tools/ace2-port-core.py tools/ace2-port-overlays.py tools/ace2-resolve-core.py tools/ace2-port-wma-hook.py tests/test_ace2_wma_hook.py tools/ace2-port-hdd-tx.py tests/test_ace2_hdd_tx.py
+          python3 -m unittest discover -s tests -p 'test_ace2_wma_hook.py'
+          python3 -m unittest discover -s tests -p 'test_ace2_hdd_tx.py'
+          python3 -m unittest discover -s tests -p 'test_ace2_sync_kernel.py'
+          python3 -m unittest discover -s tests -p 'test_ace2_vendor_build.py'
+          python3 -m unittest discover -s tests -p 'test_ace2_build_wlan.py'
+          python3 -m unittest discover -s tests -p 'test_ace2_compile_pipeline.py'
+          python3 -m unittest discover -s tests -p 'test_ace2_preflight_candidate.py'
+          python3 -m unittest discover -s tests -p 'test_ace2_artifact_report.py'
+          gcc -std=c11 -Wall -Wextra -Werror -pedantic -O2 -o "$RUNNER_TEMP/ace2-frame-test" tests/ace2-frame-test.c
+          "$RUNNER_TEMP/ace2-frame-test"
+          bash -n tools/ace2-build-baseline.sh tools/ace2-stage-candidate.sh tools/ace2-sync-kernel.sh tools/ace2-run-vendor-build.sh tools/ace2-build-wlan.sh tools/ace2-compile-pipeline.sh
+      - name: Clone public OnePlus Ace 2 vendor source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth=1 --single-branch \
+            --branch oneplus/sm8475_v_15.0.0_ace_2 \
+            https://github.com/OnePlusOSS/android_kernel_modules_and_devicetree_oneplus_sm8475.git \
+            "$RUNNER_TEMP/ace2-vendor"
+          git -C "$RUNNER_TEMP/ace2-vendor" rev-parse HEAD > "$RUNNER_TEMP/source-revision.txt"
+          python3 tools/ace2-source-audit.py --source "$RUNNER_TEMP/ace2-vendor" --json > "$RUNNER_TEMP/source-audit.json"
+      - name: Prepare real SM8475 QDF mode patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ace2-port-core.py --source "$RUNNER_TEMP/ace2-vendor" --dry-run
+          python3 tools/ace2-port-core.py --source "$RUNNER_TEMP/ace2-vendor" --report "$RUNNER_TEMP/pas-host-mode.json"
+          # Repeat application to prove our source rewrite is idempotent.
+          python3 tools/ace2-port-core.py --source "$RUNNER_TEMP/ace2-vendor"
+          git -C "$RUNNER_TEMP/ace2-vendor" add -N vendor/qcom/opensource/wlan/qcacld-3.0/core/wma/src/ace2_awdl_frame.h
+          git -C "$RUNNER_TEMP/ace2-vendor" diff --check
+          git -C "$RUNNER_TEMP/ace2-vendor" diff -- \
+            vendor/qcom/opensource/wlan/qca-wifi-host-cmn/qdf/inc/qdf_types.h \
+            vendor/qcom/opensource/wlan/qca-wifi-host-cmn/qdf/src/qdf_types.c \
+            vendor/qcom/opensource/wlan/qca-wifi-host-cmn/dp/inc/cdp_txrx_cmn_struct.h \
+            vendor/qcom/opensource/wlan/qcacld-3.0/Kconfig \
+            > "$RUNNER_TEMP/ace2-core-platform.patch"
+          test -s "$RUNNER_TEMP/ace2-core-platform.patch"
+      - name: Verify native SM8475 HDD TX staging against real vendor source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/ace2-port-hdd-tx.py --source "$RUNNER_TEMP/ace2-vendor"
+          python3 tools/ace2-port-hdd-tx.py --source "$RUNNER_TEMP/ace2-vendor" \
+            --report "$RUNNER_TEMP/hdd-native-tx.json" --write
+          python3 tools/ace2-port-hdd-tx.py --source "$RUNNER_TEMP/ace2-vendor" --write
+          python3 - "$RUNNER_TEMP/ace2-vendor" <<'PY'
+          from pathlib import Path
+          import sys
+          p = Path(sys.argv[1]) / "vendor/qcom/opensource/wlan/qcacld-3.0/core/hdd/src/wlan_hdd_tx_rx.c"
+          data = p.read_text(encoding="utf-8")
+          assert "adapter->vdev ?" in data
+          assert "adapter->device_mode == QDF_PASSTHRU_MODE" in data
+          assert "netdev_tx_t hdd_hard_start_xmit_passthru(" not in data
+          assert data.count("opairshare_pas_mgmt_xmit(") == 2
+          PY
+          git -C "$RUNNER_TEMP/ace2-vendor" diff --check
+      - name: Upload audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ace2-vendor-source-audit
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/source-audit.json
+            ${{ runner.temp }}/source-revision.txt
+            ${{ runner.temp }}/pas-host-mode.json
+            ${{ runner.temp }}/hdd-native-tx.json
+            ${{ runner.temp }}/ace2-core-platform.patch
+  # An explicit [ace2-candidate-kernel] commit requests disposable compiler
+  # diagnostics; never publish an unverified WLAN .ko as an installable module.
+  kernel-baseline:
+    needs: source-audit
+    if: (github.event_name == 'workflow_dispatch' && inputs.full_kernel) || (github.event_name == 'push' && (contains(github.event.head_commit.message, '[ace2-full-kernel]') || contains(github.event.head_commit.message, '[ace2-candidate-kernel]')))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free space and install build requirements
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/local/lib/android /opt/hostedtoolcache /usr/share/dotnet /usr/local/share/powershell || true
+          sudo apt-get update
+          sudo apt-get install -y git git-lfs curl python3 rsync unzip zip bc bison flex libssl-dev \
+             libelf-dev libncurses-dev cpio lz4 zstd dwarves kmod jq
+          df -h .
+      - name: Sync official Ace 2 kernel and compile baseline modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ACE2_APPLY_MODE_PATCH=1
+          export ACE2_COMPILE_CANDIDATE="${{ (github.event_name == 'workflow_dispatch' && inputs.candidate_port || (github.event_name == 'push' && contains(github.event.head_commit.message, '[ace2-candidate-kernel]'))) && '1' || '0' }}"
+          export ACE2_PORT_ROOT="$GITHUB_WORKSPACE"
+          export ACE2_BUILD_ROOT="$RUNNER_TEMP/ace2"
+          export ACE2_SYNC_JOBS=2 # bounded parallel CodeLinaro sync; per-project recovery uses -j1
+          # Fast candidate C/API diagnostics only; never publish no-LTO binaries.
+          export ACE2_DIAGNOSTIC_LTO=thin
+          bash tools/ace2-build-baseline.sh
+      - name: Upload source lock, kernel-module inventory, failure logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ace2-kernel-baseline-reports
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/ace2/reports/**
+            ${{ runner.temp }}/ace2/platform/LOGDIR/*.log
+      - name: Summarize GKI and WLAN gates
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### OnePlus Ace 2 candidate compile (not installable)'
+            if [[ -f "$RUNNER_TEMP/ace2/reports/compile-stage-results.txt" ]]; then
+              sed 's/^/- /' "$RUNNER_TEMP/ace2/reports/compile-stage-results.txt"
+            else
+              echo '- Compilation did not reach both GKI/WLAN gate results; inspect uploaded logs.'
+            fi
+            if [[ -f "$RUNNER_TEMP/ace2/reports/wlan-build-invocation.txt" ]]; then
+              echo '- WLAN compiler provenance:'
+              grep -E '^(compiler|compiler_source|candidate|installable)=' \
+                "$RUNNER_TEMP/ace2/reports/wlan-build-invocation.txt" | sed 's/^/  - /'
+            fi
+            echo '- Runtime AirDrop, firmware and Wi-Fi recovery: NOT VERIFIED'
+          } >> "$GITHUB_STEP_SUMMARY"
+
